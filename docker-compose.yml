@@ -1,0 +1,20 @@
+services:
+  backend:
+    build: ./backend
+    environment:
+      THERAPYTRACE_DB: sqlite:////data/therapytrace.db
+      THERAPYTRACE_ORIGINS: "*"
+    volumes:
+      - therapytrace-data:/data
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+volumes:
+  therapytrace-data:

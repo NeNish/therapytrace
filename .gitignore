@@ -1,0 +1,21 @@
+__pycache__/
+*.py[cod]
+*.db
+.venv/
+venv/
+.env
+
+node_modules/
+dist/
+.vite/
+
+.DS_Store
+.pytest_cache/
+.idea/
+.vscode/
+
+# never commit clinical material
+corpus/
+data/
+transcripts/
+*.transcript
