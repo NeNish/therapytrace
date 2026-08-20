@@ -118,6 +118,27 @@ cd backend && python -m pytest tests -q
 
 ---
 
+## Machine learning (M10)
+
+Two classifiers trained on **AnnoMI** — 133 expert-annotated MI dialogues,
+6,725 labelled client utterances.
+
+| Task | Accuracy | Macro-F1 |
+|---|---|---|
+| Client talk type (change / sustain / neutral) | 0.54 | 0.49 |
+| Therapist behaviour (question / reflection / input / other) | 0.65 | 0.61 |
+
+Splits are grouped by conversation, never by utterance — an utterance-level
+split leaks speaker and topic between train and test and inflates every metric.
+
+**Convergent validation:** the rule-based lexicon never saw the expert labels,
+so AnnoMI independently tests it. All five dimensions order correctly
+(change talk > sustain talk); the composite scores d = 0.389, p = 7.4e-18 at
+utterance level, and correlates r = 0.344 (p < 0.001) with the expert
+change-talk ratio across 93 conversations.
+
+See `ml/README.md` for the full ablation and the honest negative results.
+
 ## The method
 
 ### Within-person standardisation

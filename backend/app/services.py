@@ -62,6 +62,7 @@ def add_session(
     analysis.utterance_series = result["utterance_series"]
     analysis.therapist_impact = result["therapist_impact"]
     analysis.therapist_moments = result["therapist_moments"]
+    analysis.ml = result.get("ml", {})
     analysis.parse_info = {
         **result["parse"],
         "confidence_notes": result["score"]["confidence_notes"],

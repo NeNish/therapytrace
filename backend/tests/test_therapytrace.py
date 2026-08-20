@@ -237,3 +237,49 @@ def test_insert_time_score_matches_recomputed_series(client):
     assert returned[1:] == pytest.approx(series[1:], abs=0.01)
     assert len(set(returned)) > 1, "every POST returned the same score"
     client.delete(f"/api/clients/{cid}")
+
+
+# --------------------------------------------------------------------------
+# M10 — supervised models
+# --------------------------------------------------------------------------
+
+def test_ml_module_degrades_gracefully_without_artifacts():
+    """The pipeline must run identically on a clone that never trained."""
+    from app.nlp.ml_models import available, session_ml_summary
+
+    out = session_ml_summary(["I decided to go and I told her why."], ["What was that like?"])
+    assert set(out["available"]) == {"change_talk", "therapist_behaviour"}
+    for key in ("client_talk", "therapist_behaviour"):
+        assert key in out
+
+
+@pytest.mark.skipif(
+    not __import__("app.nlp.ml_models", fromlist=["available"]).available()["change_talk"],
+    reason="trained artifacts not present",
+)
+def test_change_talk_model_separates_clear_cases():
+    from app.nlp.ml_models import classify_client_turns
+
+    out = classify_client_turns([
+        "I decided to stop drinking on weekdays and I told my wife about it.",
+        "I don't think I can change, it is just who I am and it always has been.",
+    ])
+    assert out["labels"][0] != "sustain"
+    assert out["change_talk_ratio"] is not None
+
+
+@pytest.mark.skipif(
+    not __import__("app.nlp.ml_models", fromlist=["available"]).available()["therapist_behaviour"],
+    reason="trained artifacts not present",
+)
+def test_therapist_model_recognises_a_question():
+    from app.nlp.ml_models import classify_therapist_turns
+
+    out = classify_therapist_turns(["What would it look like if you did make that change?"])
+    assert out["labels"][0] == "question"
+
+
+def test_models_endpoint(client):
+    body = client.get("/api/models").json()
+    assert len(body["models"]) == 2
+    assert "GroupKFold" in body["split_protocol"]

@@ -77,6 +77,7 @@ class SessionAnalysis(Base):
     therapist_impact: Mapped[list] = mapped_column(JSON, default=list)
     therapist_moments: Mapped[dict] = mapped_column(JSON, default=dict)
     parse_info: Mapped[dict] = mapped_column(JSON, default=dict)
+    ml: Mapped[dict] = mapped_column(JSON, default=dict)
     engine_version: Mapped[str] = mapped_column(String(16), default="1.0.0")
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=_now)
 

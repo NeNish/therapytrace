@@ -128,6 +128,7 @@ def _session_detail(sess: TherapySession) -> dict:
         "utterance_series": a.utterance_series,
         "therapist_impact": a.therapist_impact,
         "therapist_moments": a.therapist_moments,
+        "ml": a.ml or {},
         "parse_info": a.parse_info,
     }
 
@@ -254,3 +255,47 @@ def calibration(db: DbSession = Depends(get_db)):
 def analyze(payload: AnalyzeRequest):
     """Score one transcript without saving anything. Useful for a quick look."""
     return analyse_session(payload.transcript)
+
+
+# --------------------------------------------------------------------------
+# M10 — supervised models
+# --------------------------------------------------------------------------
+
+@router.get("/models")
+def model_info():
+    """
+    What supervised models are loaded, and how well they actually perform.
+
+    Reported figures come from held-out *conversations*, never held-out
+    utterances — utterances from one conversation share a speaker and a topic,
+    so an utterance-level split leaks and inflates every metric.
+    """
+    from ..nlp.ml_models import REPORTED_METRICS, available
+
+    avail = available()
+    return {
+        "dataset": "AnnoMI (Wu et al., 2023) — 133 expert-annotated MI dialogues",
+        "split_protocol": "GroupKFold / GroupShuffleSplit on transcript_id",
+        "models": [
+            {
+                "id": "change_talk",
+                "task": "Client utterance -> change / sustain / neutral",
+                "loaded": avail["change_talk"],
+                "algorithm": "TF-IDF (1-2 gram) + TherapyTrace lexicon -> logistic regression",
+                "held_out_accuracy": REPORTED_METRICS["client"]["accuracy"],
+                "held_out_macro_f1": REPORTED_METRICS["client"]["macro_f1"],
+                "role": "External validation of the five process dimensions "
+                        "against expert change-talk annotations.",
+            },
+            {
+                "id": "therapist_behaviour",
+                "task": "Therapist utterance -> question / reflection / therapist_input / other",
+                "loaded": avail["therapist_behaviour"],
+                "algorithm": "TF-IDF (1-2 gram) + TherapyTrace lexicon -> logistic regression",
+                "held_out_accuracy": REPORTED_METRICS["therapist"]["accuracy"],
+                "held_out_macro_f1": REPORTED_METRICS["therapist"]["macro_f1"],
+                "role": "Replaces the regex intervention taxonomy in M6 with a "
+                        "classifier trained on MISC-coded data.",
+            },
+        ],
+    }

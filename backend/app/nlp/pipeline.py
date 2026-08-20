@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .features import DIMENSIONS, session_features
+from .ml_models import session_ml_summary
 from .scoring import Baseline, build_baseline, score_session
 from .therapist import aggregate_impact, analyse_turn_pairs, top_moments
 from .trajectory import summarise
@@ -18,6 +19,19 @@ def analyse_session(raw_transcript: str, baseline: Baseline | None = None) -> di
     scored = score_session(feats, base)
 
     pairs = analyse_turn_pairs(parsed.turns)
+
+    # M10 — supervised classifiers. Returns availability flags and None-valued
+    # sections when the trained artifacts are absent, so the pipeline behaves
+    # identically on a fresh clone that has not run training.
+    prev_for_client = []
+    for t in parsed.client_turns:
+        earlier = [x for x in parsed.turns if x.idx < t.idx]
+        prev_for_client.append(earlier[-1].text if earlier else "")
+    ml = session_ml_summary(
+        client_texts=client_texts,
+        therapist_texts=[t.text for t in parsed.therapist_turns],
+        prev_for_client=prev_for_client,
+    )
 
     # Utterance-level drivers: which client turns pulled each dimension up or down
     ranked = sorted(
@@ -63,6 +77,7 @@ def analyse_session(raw_transcript: str, baseline: Baseline | None = None) -> di
             for i, s in enumerate(utt_scores)
         ],
         "drivers": drivers,
+        "ml": ml,
         "therapist_impact": aggregate_impact(pairs),
         "therapist_moments": top_moments(pairs),
         "parse": {
