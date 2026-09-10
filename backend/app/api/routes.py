@@ -316,3 +316,26 @@ def client_profile(client_id: int, db: DbSession = Depends(get_db)):
             "hypotheses for supervision; they do not identify causal effects."
         ),
     }
+
+
+@router.post("/review/video")
+def review_video(payload: dict):
+    """
+    M15 — analyse a recorded session and surface the moments worth watching.
+
+    Expects {"video_path": "...", "audio_path": "...", "output_video": "...",
+             "max_seconds": 300}. Paths are server-side; this is a research
+    tool operating on files already placed on the machine, not an upload
+    endpoint, and it does not capture from any device.
+    """
+    from ..nlp.review import review_session
+
+    video = payload.get("video_path")
+    if not video:
+        raise HTTPException(400, "video_path is required.")
+    return review_session(
+        video,
+        output_video=payload.get("output_video"),
+        audio_path=payload.get("audio_path"),
+        max_seconds=payload.get("max_seconds"),
+    )

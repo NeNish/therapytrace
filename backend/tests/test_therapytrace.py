@@ -342,3 +342,54 @@ def test_visual_missing_file_degrades_gracefully():
     from app.nlp.visual import session_visual
     out = session_visual("/nonexistent/v.mp4", [{"speaker": "client", "start": 0, "end": 2}])
     assert out["available"] is False
+
+
+# --------------------------------------------------------------------------
+# M15 — session review renderer
+# --------------------------------------------------------------------------
+
+def _synth_clip(path, seconds=4, fps=15, w=320, h=240):
+    import cv2, numpy as np
+    vw = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
+    for i in range(seconds * fps):
+        f = np.full((h, w, 3), 205, np.uint8)
+        cx = w // 2
+        cv2.ellipse(f, (cx, 90), (34, 42), 0, 0, 360, (180, 152, 142), -1)
+        cv2.circle(f, (cx - 12, 82), 4, (25, 25, 25), -1)
+        cv2.circle(f, (cx + 12, 82), 4, (25, 25, 25), -1)
+        cv2.ellipse(f, (cx, 108), (14, 5), 0, 0, 180, (70, 45, 45), 2)
+        cv2.rectangle(f, (cx - 48, 136), (cx + 48, h), (70, 90, 120), -1)
+        vw.write(f)
+    vw.release()
+
+
+def test_review_analyses_a_clip_and_renders_overlays(tmp_path):
+    from app.nlp.review import review_session
+
+    src, dst = tmp_path / "s.mp4", tmp_path / "s_out.mp4"
+    _synth_clip(src)
+    r = review_session(src, output_video=dst)
+
+    assert r["video"]["available"] is True
+    assert r["video"]["n_sampled"] > 0
+    assert r["video"]["face_detection_rate"] > 0.5   # a drawn face is detectable
+    assert r["render"]["available"] is True
+    assert dst.exists() and dst.stat().st_size > 0
+
+
+def test_review_missing_video_degrades_gracefully():
+    from app.nlp.review import review_session
+    out = review_session("/nonexistent/clip.mp4")
+    assert out["available"] is False
+
+
+def test_moments_are_spread_across_the_session(tmp_path):
+    from app.nlp.review import analyse_video, find_moments
+
+    src = tmp_path / "s.mp4"
+    _synth_clip(src, seconds=6)
+    a = analyse_video(src)
+    moments = find_moments(a, k=3)
+    times = [m["t"] for m in moments]
+    assert times == sorted(times)          # chronological
+    assert len(set(times)) == len(times)   # non-maximum suppression worked
