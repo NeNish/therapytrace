@@ -122,7 +122,12 @@ def client_trajectory(db: DbSession, client: Client) -> dict:
         }
         for s in ordered
     ]
-    roll = rollup_client(rows)
+    pooled_pairs: list[dict] = []
+    for s_ in ordered:
+        for m in (s_.analysis.therapist_moments or {}).get("openings", []):
+            pass
+        pooled_pairs.extend((s_.analysis.parse_info or {}).get("turn_pairs", []))
+    roll = rollup_client(rows, pooled_pairs)
 
     measures = db.scalars(
         select(OutcomeMeasure).where(OutcomeMeasure.client_id == client.id)

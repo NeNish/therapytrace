@@ -69,3 +69,45 @@ The lexicon never saw the expert labels, so AnnoMI is an independent test of it.
 No transformer. Fine-tuning MentalBERT needs HuggingFace access, which this
 build environment does not have. `train.py` is structured so the transformer
 slots in as one more configuration in `build_pipelines()`.
+
+---
+
+## Empirical finding — intervention effect is conditional on client state
+
+`state_conditional_study.py`, run over 1,815 turn triples from 123 real
+conversations. Client state is measured by the TherapyTrace process score; the
+**outcome is the expert's own change-talk label**, so the result does not depend
+on our lexicon being right about the outcome.
+
+P(next client turn is change talk):
+
+| Therapist move | Client stuck | Middling | Already moving | Swing |
+|---|---|---|---|---|
+| Open question | 26.8% | 41.2% | **47.9%** | +21 pts *** |
+| Reflection | 26.0% | 38.2% | **45.5%** | +19 pts *** |
+| Advice / information | 25.3% | 26.5% | 29.6% | +4 pts n.s. |
+| Other | 24.4% | 33.1% | 41.5% | +17 pts *** |
+
+Three things fall out of this table:
+
+1. **Questions and reflections are amplifiers, not causes.** They roughly double
+   their yield depending on the state they land in. The unconditional figure the
+   field usually reports — questions 36.9%, reflections 34.4% — averages over a
+   twenty-point spread and hides the effect entirely.
+
+2. **Advice-giving is inert to state** (+4 pts, p = 0.73). It returns the same
+   low rate whether the client is stuck or moving. It does not amplify.
+
+3. **When a client is stuck, intervention choice barely matters** — all four
+   converge to 24–27%. The differences between techniques only appear once the
+   client already has momentum. That reframes the clinical question from "which
+   technique is best" to "what moves a client out of a stuck state at all".
+
+A fourth result is incidental but useful: the process-score terciles predict
+expert change-talk rate monotonically for every intervention type. That is a
+third independent validation of the lexicon, on a different quantity from the
+earlier two.
+
+**Confounding by indication is severe and unresolved.** Therapists ask questions
+of clients who are already engaged. This is a description of what happens in
+real sessions, not an experiment, and no causal claim is made.

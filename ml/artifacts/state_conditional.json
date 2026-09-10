@@ -1,0 +1,159 @@
+{
+  "n_triples": 1815,
+  "n_conversations": 123,
+  "state_thresholds": {
+    "stuck_below": 0.39,
+    "moving_above": 0.4469
+  },
+  "change_talk_by_intervention_and_state": [
+    {
+      "intervention": "question",
+      "by_state": {
+        "stuck": 0.2681818181818182,
+        "middling": 0.4117647058823529,
+        "moving": 0.47928994082840237
+      },
+      "n_by_state": {
+        "stuck": 220,
+        "middling": 85,
+        "moving": 169
+      },
+      "n_total": 474,
+      "spread": 0.2111
+    },
+    {
+      "intervention": "reflection",
+      "by_state": {
+        "stuck": 0.2598870056497175,
+        "middling": 0.38235294117647056,
+        "moving": 0.45454545454545453
+      },
+      "n_by_state": {
+        "stuck": 177,
+        "middling": 68,
+        "moving": 110
+      },
+      "n_total": 355,
+      "spread": 0.1947
+    },
+    {
+      "intervention": "therapist_input",
+      "by_state": {
+        "stuck": 0.25316455696202533,
+        "middling": 0.2647058823529412,
+        "moving": 0.2962962962962963
+      },
+      "n_by_state": {
+        "stuck": 79,
+        "middling": 34,
+        "moving": 54
+      },
+      "n_total": 167,
+      "spread": 0.0431
+    },
+    {
+      "intervention": "other",
+      "by_state": {
+        "stuck": 0.24378109452736318,
+        "middling": 0.3310344827586207,
+        "moving": 0.41544117647058826
+      },
+      "n_by_state": {
+        "stuck": 402,
+        "middling": 145,
+        "moving": 272
+      },
+      "n_total": 819,
+      "spread": 0.1717
+    }
+  ],
+  "conditional_tests": [
+    {
+      "intervention": "question",
+      "p_change_when_stuck": 0.2682,
+      "n_stuck": 220,
+      "p_change_when_moving": 0.4793,
+      "n_moving": 169,
+      "chi2": 17.585,
+      "p_value": 2.747228916480231e-05,
+      "significant": true
+    },
+    {
+      "intervention": "reflection",
+      "p_change_when_stuck": 0.2599,
+      "n_stuck": 177,
+      "p_change_when_moving": 0.4545,
+      "n_moving": 110,
+      "chi2": 10.69,
+      "p_value": 0.0010773616435877298,
+      "significant": true
+    },
+    {
+      "intervention": "therapist_input",
+      "p_change_when_stuck": 0.2532,
+      "n_stuck": 79,
+      "p_change_when_moving": 0.2963,
+      "n_moving": 54,
+      "chi2": 0.123,
+      "p_value": 0.7255222342869878,
+      "significant": false
+    },
+    {
+      "intervention": "other",
+      "p_change_when_stuck": 0.2438,
+      "n_stuck": 402,
+      "p_change_when_moving": 0.4154,
+      "n_moving": 272,
+      "chi2": 21.438,
+      "p_value": 3.653687844033748e-06,
+      "significant": true
+    }
+  ],
+  "state_conditional_policy": [
+    {
+      "state": "stuck",
+      "best": "question",
+      "best_rate": 0.2682,
+      "worst": "other",
+      "worst_rate": 0.2438,
+      "all": {
+        "question": 0.2682,
+        "reflection": 0.2599,
+        "therapist_input": 0.2532,
+        "other": 0.2438
+      }
+    },
+    {
+      "state": "middling",
+      "best": "question",
+      "best_rate": 0.4118,
+      "worst": "therapist_input",
+      "worst_rate": 0.2647,
+      "all": {
+        "question": 0.4118,
+        "reflection": 0.3824,
+        "therapist_input": 0.2647,
+        "other": 0.331
+      }
+    },
+    {
+      "state": "moving",
+      "best": "question",
+      "best_rate": 0.4793,
+      "worst": "therapist_input",
+      "worst_rate": 0.2963,
+      "all": {
+        "question": 0.4793,
+        "reflection": 0.4545,
+        "therapist_input": 0.2963,
+        "other": 0.4154
+      }
+    }
+  ],
+  "unconditional": {
+    "question": 0.3692,
+    "reflection": 0.3437,
+    "therapist_input": 0.2695,
+    "other": 0.3162
+  }
+}

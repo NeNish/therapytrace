@@ -299,3 +299,20 @@ def model_info():
             },
         ],
     }
+
+
+@router.get("/clients/{client_id}/profile")
+def client_profile(client_id: int, db: DbSession = Depends(get_db)):
+    """M11 — mechanism ordering and state-conditional response profile."""
+    client = _get_client(db, client_id)
+    from ..services import client_trajectory
+
+    roll = client_trajectory(db, client)
+    return {
+        "client_code": client.code,
+        "profile": roll.get("profile"),
+        "note": (
+            "Both analyses are per-person and observational. They generate "
+            "hypotheses for supervision; they do not identify causal effects."
+        ),
+    }

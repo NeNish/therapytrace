@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .features import DIMENSIONS, session_features
 from .ml_models import session_ml_summary
+from .mechanism import profile_client
 from .scoring import Baseline, build_baseline, score_session
 from .therapist import aggregate_impact, analyse_turn_pairs, top_moments
 from .trajectory import summarise
@@ -91,7 +92,7 @@ def analyse_session(raw_transcript: str, baseline: Baseline | None = None) -> di
     }
 
 
-def rollup_client(session_rows: list[dict]) -> dict:
+def rollup_client(session_rows: list[dict], turn_records: list[dict] | None = None) -> dict:
     """
     session_rows: ordered list of {"session_number", "features", "tpi", "z", ...}
     Recomputes the baseline from the earliest sessions and rescores everything,
@@ -116,4 +117,5 @@ def rollup_client(session_rows: list[dict]) -> dict:
         "tpi_series": tpi_series,
         "dimension_series": dim_series,
         "trajectory": summarise(tpi_series),
+        "profile": profile_client(dim_series, turn_records or []),
     }
