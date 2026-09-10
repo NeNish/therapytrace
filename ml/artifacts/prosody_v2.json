@@ -1,0 +1,15 @@
+{
+  "n": 2343,
+  "n_conversations": 132,
+  "auc": {
+    "timing_raw": 0.5387,
+    "timing_raw_gb": 0.5446,
+    "timing_wp": 0.5339,
+    "timing_wp_gb": 0.5122,
+    "text": 0.624,
+    "text_timing_raw": 0.5913,
+    "text_timing_wp": 0.5671
+  },
+  "within_person_gain": -0.0324,
+  "multimodal_gain_over_text": -0.0569
+}

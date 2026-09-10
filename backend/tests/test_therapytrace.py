@@ -283,3 +283,62 @@ def test_models_endpoint(client):
     body = client.get("/api/models").json()
     assert len(body["models"]) == 2
     assert "GroupKFold" in body["split_protocol"]
+
+
+# --------------------------------------------------------------------------
+# M12-M14 — multimodal tier
+# --------------------------------------------------------------------------
+
+def test_acoustic_extracts_expected_feature_set(tmp_path):
+    import numpy as np, soundfile as sf
+    from app.nlp.acoustic import extract_acoustic
+
+    sr = 16000
+    t = np.arange(sr * 3) / sr
+    y = (np.sin(2 * np.pi * 150 * t) + 0.3 * np.sin(2 * np.pi * 300 * t)).astype("float32")
+    p = tmp_path / "a.wav"
+    sf.write(p, y, sr)
+
+    f = extract_acoustic(p)
+    assert f is not None
+    for k in ("f0_mean", "energy_mean", "pause_ratio", "jitter", "hnr", "mfcc1_mean"):
+        assert k in f
+    assert 100 < f["f0_mean"] < 220
+
+
+def test_acoustic_missing_file_returns_none():
+    from app.nlp.acoustic import extract_acoustic
+    assert extract_acoustic("/nonexistent/file.wav") is None
+
+
+def test_within_person_standardisation_centres_the_baseline():
+    from app.nlp.acoustic import standardise_within_client
+
+    base = [{"f0_mean": 100.0}, {"f0_mean": 110.0}, {"f0_mean": 120.0}]
+    out = standardise_within_client([{"f0_mean": 110.0}], base)
+    assert abs(out[0]["f0_mean_z"]) < 0.01  # the baseline mean maps to zero
+
+
+def test_fusion_leaves_text_score_alone_without_other_modalities():
+    from app.nlp.multimodal import fuse
+    out = fuse(63.5)
+    assert out["tpi_multimodal"] == 63.5
+    assert out["modalities_used"] == 1
+    assert out["agreement"] == "text_only"
+
+
+def test_fusion_shift_is_bounded():
+    """No combination of acoustic evidence may override the text tier."""
+    from app.nlp.multimodal import MAX_SHIFT, fuse
+
+    extreme = {"available": True, "session_mean": {
+        "f0_cv_z": 50.0, "f0_range_z": 50.0, "energy_cv_z": 50.0,
+        "hnr_z": 50.0, "syllable_rate_z": 50.0}}
+    out = fuse(50.0, extreme, None)
+    assert abs(out["total_shift"]) <= MAX_SHIFT + 1e-6
+
+
+def test_visual_missing_file_degrades_gracefully():
+    from app.nlp.visual import session_visual
+    out = session_visual("/nonexistent/v.mp4", [{"speaker": "client", "start": 0, "end": 2}])
+    assert out["available"] is False

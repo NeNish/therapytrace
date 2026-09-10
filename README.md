@@ -139,6 +139,49 @@ change-talk ratio across 93 conversations.
 
 See `ml/README.md` for the full ablation and the honest negative results.
 
+## Multimodal tier (M12–M14)
+
+Three channels, all standardised **within person** — because vocal tract length
+sets f0 and face geometry sets every landmark ratio, exactly as speaking style
+sets word counts.
+
+| Module | Channel | Features | Library |
+|---|---|---|---|
+| M12 | Acoustic | 48 per utterance: f0 mean/sd/range/CV, energy, pause count & ratio, longest pause, jitter, shimmer, HNR, spectral, 13 MFCCs | librosa |
+| M13 | Visual | 15 per turn: expressivity range, AU proxies, head pose & motion, gaze aversion, blink rate | MediaPipe Face Mesh |
+| M14 | Fusion | Late fusion, bounded modifiers | — |
+
+### Why late fusion, and why text stays primary
+
+We tested the multimodal hypothesis before building on it. Timestamp-derived
+timing (speech rate, duration, pause approximations) on 2,343 real utterances:
+
+| Model | AUC (grouped 5-fold) |
+|---|---|
+| Text process score only | **0.624** |
+| Timing only, logistic regression | 0.539 |
+| Timing only, gradient boosting | 0.545 |
+| Timing, within-person z-scored, GB | 0.512 |
+| Text + timing | 0.567 — **worse than text alone** |
+
+Coarse timing carries essentially nothing, and a stronger model does not rescue
+it. That result constrains the design: acoustic and visual channels enter as
+**bounded modifiers**, able to move the index by at most ±4 points combined,
+never as equal votes. When they disagree with the text tier, the disagreement is
+surfaced rather than averaged away.
+
+What that experiment does *not* show is that genuine acoustics are useless —
+pitch contour, jitter and true pause structure live at millisecond resolution
+and are invisible to a 1-second transcript timestamp. M12 is what makes testing
+them possible once session audio is available.
+
+### A deliberate omission
+
+M13 emits **no valence score**. Stillness in therapy is as often deep processing
+as disengagement, and a smile is as often avoidance as affect. Reading facial
+expression as mood would be a category error in a *process* instrument, so the
+module reports expressive range and movement only.
+
 ## The method
 
 ### Within-person standardisation

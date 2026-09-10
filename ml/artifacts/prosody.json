@@ -1,0 +1,19 @@
+{
+  "n": 2319,
+  "n_conversations": 132,
+  "rate_by_label": {
+    "change": 3.1124,
+    "neutral": 3.1493,
+    "sustain": 3.1346
+  },
+  "cohens_d_change_vs_sustain": -0.0258,
+  "p": 0.5454346409838196,
+  "r_process": 0.2088,
+  "r_rate": -0.0174,
+  "auc": {
+    "text only": 0.6253,
+    "rate only": 0.4866,
+    "text + rate": 0.6196
+  },
+  "incremental_auc": -0.0057
+}
