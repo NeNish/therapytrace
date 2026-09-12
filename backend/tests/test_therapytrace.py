@@ -471,3 +471,28 @@ def test_recommender_prefers_the_clients_own_history_when_it_is_positive():
     out = next_session_suggestion([58.0], profile)
     assert out["evidence_source"] == "this client's own history"
     assert out["ranked"][0]["intervention"] == "affirmation"
+
+
+@pytest.mark.skipif(
+    not __import__("pathlib").Path("/tmp/head-pose-face-detection-female.mp4").exists(),
+    reason="sample video not downloaded; see ml/README.md",
+)
+def test_review_on_real_human_footage():
+    """
+    Regression against a real recording rather than a synthetic figure.
+
+    The synthetic clips used elsewhere in this suite are enough to prove the
+    code path runs, but MediaPipe Pose is trained on real people and cannot
+    find a drawn stick figure — so pose tracking was unverified until this
+    test. Sample: a seated person facing the camera, the framing a counselling
+    recording actually has.
+    """
+    from app.nlp.review import review_session
+
+    r = review_session("/tmp/head-pose-face-detection-female.mp4", max_seconds=8)
+    v = r["video"]
+    assert v["available"] is True
+    assert v["face_detection_rate"] > 0.8
+    assert v["pose_detection_rate"] > 0.8
+    assert v["summary"]["posture_openness_mean"] > 0
+    assert len(r["moments"]) > 0

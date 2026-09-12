@@ -111,3 +111,35 @@ earlier two.
 **Confounding by indication is severe and unresolved.** Therapists ask questions
 of clients who are already engaged. This is a description of what happens in
 real sessions, not an experiment, and no causal claim is made.
+
+
+---
+
+## Sample video for the review module (M15)
+
+M15 is verified against real footage, not only synthetic clips. MediaPipe Pose
+is trained on real people and cannot find a drawn figure, so pose tracking
+stayed unverified until a genuine recording was used.
+
+```bash
+curl -L -o /tmp/head-pose-face-detection-female.mp4 \
+  https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/head-pose-face-detection-female.mp4
+
+python -m pytest backend/tests -k real_human_footage
+```
+
+Measured on 20 s of that clip (768x432, 12 fps, seated person facing camera —
+the framing a counselling recording actually has):
+
+| | |
+|---|---|
+| Face detection | **100%** |
+| Pose detection | **100%** |
+| Throughput | 1.7x realtime on CPU |
+| Posture openness | 1.275 (elbow span / shoulder width) |
+| Gesture amplitude | 0.041 mean, 0.094 SD |
+
+A useful negative control: the same pipeline on `vtest.avi` (distant walking
+figures, surveillance framing) detects **0%** for both face and pose. The module
+needs the subject reasonably close and facing the camera. That is a real
+deployment constraint and it is stated rather than discovered later.
