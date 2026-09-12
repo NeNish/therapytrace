@@ -642,3 +642,82 @@ def test_combined_brief_puts_language_first():
     brief = combined_insight(note, body)
     assert brief["brief"].startswith("This session scored 61")
     assert brief["channels_used"] >= 2
+
+
+# --------------------------------------------------------------------------
+# M20 — model-generated insight
+# --------------------------------------------------------------------------
+
+_NOTE = {
+    "sentences": [
+        "This session scored 49 on the progress index.",
+        "The index has been falling about 1.3 points per session.",
+    ],
+    "flags": [{"kind": "plateau"}],
+    "note": "(deterministic fallback)",
+}
+_TRAJ = {"momentum": {"state": "regressing"},
+         "recent_trend": {"slope_per_session": -1.3}, "n_sessions": 11}
+
+
+def test_model_draft_is_accepted_when_every_figure_traces_to_an_input():
+    from app.nlp.generate import generate_insight
+
+    draft = ("The session scored 49 on the progress index. Across 11 sessions the "
+             "index has fallen about 1.3 points per session.")
+    out = generate_insight(_NOTE, trajectory=_TRAJ, _transport=lambda p: draft)
+    assert out["source"] == "model"
+    assert out["verified"] is True
+
+
+def test_invented_figures_are_rejected():
+    """The guard that makes generation usable: no number may be invented."""
+    from app.nlp.generate import generate_insight
+
+    draft = "The session scored 49. Engagement fell 37% and alliance dropped to 62."
+    out = generate_insight(_NOTE, trajectory=_TRAJ, _transport=lambda p: draft)
+    assert out["source"] == "template"
+    assert "unsupported figures" in out["reason"]
+    assert "62" in out["reason"] and "37" in out["reason"]
+    assert out["note"] == "(deterministic fallback)"
+    assert "rejected_draft" in out          # failures are visible, not silent
+
+
+def test_inferential_language_is_rejected():
+    from app.nlp.generate import generate_insight
+
+    draft = "The session scored 49. The client appeared defensive and withdrawn."
+    out = generate_insight(_NOTE, trajectory=_TRAJ, _transport=lambda p: draft)
+    assert out["source"] == "template"
+    assert "inferential language" in out["reason"]
+
+
+def test_falls_back_cleanly_with_no_api_key(monkeypatch):
+    from app.nlp.generate import generate_insight
+
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    out = generate_insight(_NOTE)
+    assert out["source"] == "template"
+    assert out["verified"] is True
+
+
+def test_generation_failure_falls_back_rather_than_raising():
+    from app.nlp.generate import generate_insight
+
+    def boom(_):
+        raise RuntimeError("network down")
+
+    out = generate_insight(_NOTE, _transport=boom)
+    assert out["source"] == "template"
+    assert "generation failed" in out["reason"]
+
+
+def test_payload_carries_only_measured_values():
+    """The model must never see free narrative it could pattern-match on."""
+    from app.nlp.generate import build_payload
+
+    p = build_payload(_NOTE, features={"n_client_words": 900, "tpi": 49.0},
+                      trajectory=_TRAJ)
+    assert set(p) <= {"measurements", "flags", "session_features",
+                      "trajectory", "body_observations", "voice"}
+    assert all(isinstance(v, (int, float)) for v in p["session_features"].values())

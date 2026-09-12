@@ -431,3 +431,30 @@ def review_body(payload: dict):
         aligned = a.get("turns") if a.get("available") else None
 
     return body_language_insights(r["video"], aligned)
+
+
+@router.get("/clients/{client_id}/insights/generated")
+def generated_insight(client_id: int, db: DbSession = Depends(get_db)):
+    """
+    M20 — the session note written by a language model rather than templates.
+
+    Every figure in the output is checked against the values supplied to the
+    model. A draft containing a number that was never given to it is rejected
+    and the deterministic note is returned instead, with the offending value
+    named. Set ANTHROPIC_API_KEY to enable; without it this returns the
+    template note.
+    """
+    client = _get_client(db, client_id)
+    from ..nlp.generate import generate_insight
+    from ..services import client_trajectory
+
+    roll = client_trajectory(db, client)
+    note = roll.get("narrative") or {}
+    sessions = roll.get("sessions") or []
+
+    out = generate_insight(
+        note,
+        features=sessions[-1].get("features") if sessions else None,
+        trajectory=roll.get("trajectory"),
+    )
+    return {"client_code": client.code, **out}

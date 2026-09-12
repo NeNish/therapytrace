@@ -274,6 +274,40 @@ starting when they began talking about their father, and their ownership score
 was lowest in that stretch" is fully supportable — and more useful, because it
 says where to look rather than what to conclude.
 
+## Model-generated insight (M20)
+
+M16 writes the session note from templates — safe and traceable, but it reads
+like a form letter and cannot connect findings across channels the way a
+clinician would. M20 hands the measured numbers to a language model and asks it
+to write the note instead.
+
+The objection is obvious: a model that invents a statistic in a clinical
+document is worse than no document. So generation is wrapped in three
+constraints, and the third is the one that matters.
+
+1. **The prompt carries only measured values** — no free narrative the model
+   could pattern-match into a plausible-sounding clinical story.
+2. **The instructions forbid inference** — no emotion, no diagnosis, no
+   explanation of why.
+3. **Every number in the output is verified against the input.** A draft
+   containing a figure that was never supplied is rejected, and the
+   deterministic M16 note is returned instead.
+
+Verified behaviour:
+
+| Draft | Outcome |
+|---|---|
+| "scored 49… falling 1.3 points per session" | **accepted** — every figure traced |
+| "engagement fell 37%, alliance dropped to 62" | **rejected** — unsupported figures `['62', '37']` |
+| "the client appeared defensive and withdrawn" | **rejected** — inferential language |
+| no API key / network failure | falls back to the template note |
+
+The model gets to write better prose. It does not get to decide what is true.
+Rejected drafts are returned alongside the reason, so failures are visible
+rather than silent.
+
+Enable with `ANTHROPIC_API_KEY`; the system runs unchanged without one.
+
 ## The method
 
 ### Within-person standardisation
