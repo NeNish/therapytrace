@@ -182,6 +182,38 @@ as disengagement, and a smile is as often avoidance as affect. Reading facial
 expression as mood would be a category error in a *process* instrument, so the
 module reports expressive range and movement only.
 
+## Insights and recommendations (M16–M17)
+
+The system does not stop at a score. `GET /api/clients/{id}/insights` returns a
+plain-English session note and a next step.
+
+**Session note (M16)** — template-driven, not model-generated, so every
+sentence traces to a number, nothing can be fabricated, and the same inputs
+always produce the same note:
+
+> *"This session scored 49, close to this client's usual level. The clearest
+> movement was in precision in naming feelings. Future orientation sat below
+> their baseline: more replaying of what already happened. Across recent
+> sessions the index has been falling, about 1.3 points per session. Worth
+> raising in supervision."*
+
+The rule the module obeys: **report the measurement, never the inference.** It
+says "pitch variability ran 2 SD below this client's baseline", never "the
+client sounded depressed."
+
+**Recommendations (M17)** — three outputs:
+
+| Output | Example |
+|---|---|
+| Dimension targeting | "Future orientation has the most headroom — you would be looking for more talk of what comes next." |
+| Early warning | "[watch] The index has dropped 6 points over three sessions." |
+| Next-session suggestion | "Client is middling. Consider open questions — across 123 annotated sessions they were followed by change talk 41% of the time in this range, against 26% for advice-giving." |
+
+The suggestion prefers **this client's own response history** and falls back to
+the corpus prior only when their own data is thin — and says which it used. If
+no move in their history has a positive mean lift, it declines to recommend one
+rather than suggesting the least-bad option.
+
 ## The method
 
 ### Within-person standardisation

@@ -393,3 +393,81 @@ def test_moments_are_spread_across_the_session(tmp_path):
     times = [m["t"] for m in moments]
     assert times == sorted(times)          # chronological
     assert len(set(times)) == len(times)   # non-maximum suppression worked
+
+
+# --------------------------------------------------------------------------
+# M16 / M17 — narrative and recommendation
+# --------------------------------------------------------------------------
+
+def test_narrative_reports_measurements_not_inferences():
+    from app.nlp.narrative import session_note
+
+    note = session_note(
+        {"score": {"tpi": 38.0, "confidence": 0.9,
+                   "contributions": {"self_agency": -1.2, "reflection_depth": 0.1}},
+         "features": {"n_client_words": 900, "hopelessness": 0.4}, "ml": {}},
+    )
+    text = note["note"].lower()
+    assert "38" in text
+    # the module must never assert a feeling or a diagnosis
+    for banned in ("depressed", "is sad", "is anxious", "feels ", "diagnos"):
+        assert banned not in text
+    assert any(f["kind"] == "hopelessness_language" for f in note["flags"])
+
+
+def test_narrative_flags_low_confidence():
+    from app.nlp.narrative import session_note
+    note = session_note({"score": {"tpi": 50.0, "confidence": 0.4, "contributions": {}},
+                         "features": {}, "ml": {}})
+    assert any(f["kind"] == "low_confidence" for f in note["flags"])
+
+
+def test_early_warning_stays_quiet_on_a_healthy_series():
+    from app.nlp.recommend import early_warning
+    out = early_warning([50, 53, 56, 58, 61, 63], [{"n_client_words": 900}] * 6)
+    assert out["level"] == "none"
+
+
+def test_early_warning_fires_on_decline_plus_risk_language():
+    from app.nlp.recommend import early_warning
+    feats = [{"n_client_words": 900}] * 5 + [{"n_client_words": 880, "hopelessness": 0.45}]
+    out = early_warning([62, 60, 55, 50, 46, 41], feats)
+    assert out["level"] in ("watch", "elevated")
+    assert out["reasons"]
+
+
+def test_targeting_wording_matches_the_sign():
+    """A client above baseline on everything must not be told they are below it."""
+    from app.nlp.recommend import target_dimensions
+
+    dims = {d: [0.60, 0.62, 0.64, 0.66] for d in
+            ["self_agency", "future_orientation", "emotional_granularity",
+             "problem_ownership", "reflection_depth"]}
+    baseline = {"means": {d: 0.50 for d in dims}, "sds": {d: 0.05 for d in dims}}
+    out = target_dimensions(dims, baseline)
+    assert out["all_above_baseline"] is True
+    assert "below this client's baseline" not in out["summary"]
+
+
+def test_recommender_falls_back_when_nothing_in_history_worked():
+    """Never recommend the least-bad of several harmful moves."""
+    from app.nlp.recommend import next_session_suggestion
+
+    profile = {"available": True, "cells": [
+        {"intervention": "challenge", "state": "moving", "n": 6, "mean_lift": -0.05},
+        {"intervention": "directive", "state": "moving", "n": 5, "mean_lift": -0.09},
+    ]}
+    out = next_session_suggestion([58.0], profile)
+    assert out["evidence_source"] == "corpus"
+
+
+def test_recommender_prefers_the_clients_own_history_when_it_is_positive():
+    from app.nlp.recommend import next_session_suggestion
+
+    profile = {"available": True, "cells": [
+        {"intervention": "affirmation", "state": "moving", "n": 7, "mean_lift": 0.08},
+        {"intervention": "directive", "state": "moving", "n": 5, "mean_lift": -0.04},
+    ]}
+    out = next_session_suggestion([58.0], profile)
+    assert out["evidence_source"] == "this client's own history"
+    assert out["ranked"][0]["intervention"] == "affirmation"

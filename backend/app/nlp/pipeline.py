@@ -5,6 +5,8 @@ from __future__ import annotations
 from .features import DIMENSIONS, session_features
 from .ml_models import session_ml_summary
 from .mechanism import profile_client
+from .narrative import session_note
+from .recommend import recommend
 from .scoring import Baseline, build_baseline, score_session
 from .therapist import aggregate_impact, analyse_turn_pairs, top_moments
 from .trajectory import summarise
@@ -111,11 +113,32 @@ def rollup_client(session_rows: list[dict], turn_records: list[dict] | None = No
     dim_series = {
         d: [round(r["features"].get(d, 0.0), 4) for r in rescored] for d in DIMENSIONS
     }
+    traj = summarise(tpi_series)
+    profile = profile_client(dim_series, turn_records or [])
+    features_series = [r["features"] for r in rescored]
+
+    mean_words = (
+        sum(f.get("n_client_words", 0) for f in features_series) / len(features_series)
+        if features_series else 0
+    )
+
     return {
         "baseline": base.to_dict(),
         "sessions": rescored,
         "tpi_series": tpi_series,
         "dimension_series": dim_series,
-        "trajectory": summarise(tpi_series),
-        "profile": profile_client(dim_series, turn_records or []),
+        "trajectory": traj,
+        "profile": profile,
+        "recommendation": recommend(
+            tpi_series, features_series, dim_series, base.to_dict(), traj, profile
+        ),
+        "narrative": session_note(
+            {"score": {"tpi": tpi_series[-1],
+                       "confidence": rescored[-1].get("confidence", 1.0),
+                       "contributions": rescored[-1].get("contributions", {})},
+             "features": features_series[-1],
+             "ml": {}},
+            trajectory=traj,
+            baseline={"mean_words": mean_words},
+        ),
     }
