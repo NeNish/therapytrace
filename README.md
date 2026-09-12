@@ -214,6 +214,35 @@ the corpus prior only when their own data is thin — and says which it used. If
 no move in their history has a positive mean lift, it declines to recommend one
 rather than suggesting the least-bad option.
 
+## Session alignment (M18)
+
+The module that makes the visual and acoustic tiers mean anything.
+
+Before alignment the channels ran in parallel and never met. The video knew
+movement changed sharply at 22:10; the transcript knew turn 34 was the client's
+lowest-scoring utterance. Neither knew about the other, so the video could
+report movement but never what the movement was *about*.
+
+| Before | After |
+|---|---|
+| "movement changed sharply at 22:10" | "posture closed at 22:10, while the client was saying *'I don't know, it's just how my father was'* — their lowest ownership score of the session" |
+
+Timing sources, in order of preference:
+
+1. **Explicit timestamps** in the transcript — `[00:12:34]`, `(12:34)`, WebVTT
+   and SRT style. The M1 parser strips these before matching the speaker label,
+   so the timing a transcription tool already produced is used rather than
+   discarded.
+2. **Diarisation segments** supplied by the caller.
+3. **Proportional estimation** from word counts, as a last resort — and the
+   response says so, because a supervisor who jumps to a timestamp and finds the
+   wrong moment stops trusting every timestamp.
+
+`find_convergences` ranks turns by *disagreement* between channels rather than
+agreement: low language score with heightened movement, or strong language with
+unusual stillness. Movement alone is noise — people shift in their seats.
+Movement coinciding with the session's lowest ownership score is worth watching.
+
 ## The method
 
 ### Within-person standardisation

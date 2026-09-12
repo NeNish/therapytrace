@@ -364,3 +364,34 @@ def client_insights(client_id: int, db: DbSession = Depends(get_db)):
             "clinician."
         ),
     }
+
+
+@router.post("/review/aligned")
+def review_aligned(payload: dict):
+    """
+    M18 — align a transcript with a recording so each flagged moment carries the
+    words spoken at the time.
+
+    Expects {"transcript": "...", "video_path": "...", "max_seconds": 300}.
+    Explicit timestamps in the transcript are used when present; otherwise turn
+    times are estimated from word counts and the response says so.
+    """
+    from ..nlp.align import align_session
+    from ..nlp.review import review_session
+
+    transcript = payload.get("transcript")
+    if not transcript:
+        raise HTTPException(400, "transcript is required.")
+
+    video_result = None
+    if payload.get("video_path"):
+        r = review_session(payload["video_path"], max_seconds=payload.get("max_seconds"))
+        if r.get("video", {}).get("available"):
+            video_result = {**r["video"], "moments": r.get("moments", [])}
+
+    return align_session(
+        transcript,
+        video_result=video_result,
+        duration_s=payload.get("duration_s"),
+        diarisation=payload.get("diarisation"),
+    )

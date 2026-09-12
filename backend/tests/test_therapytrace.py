@@ -496,3 +496,71 @@ def test_review_on_real_human_footage():
     assert v["pose_detection_rate"] > 0.8
     assert v["summary"]["posture_openness_mean"] > 0
     assert len(r["moments"]) > 0
+
+
+# --------------------------------------------------------------------------
+# M18 — session alignment
+# --------------------------------------------------------------------------
+
+def test_explicit_timestamps_are_preferred_over_estimation():
+    from app.nlp.align import align_session
+
+    t = ("[00:00:05] THERAPIST: How was the week?\n"
+         "[00:00:20] CLIENT: It was hard, I went quiet again like I always do.\n"
+         "[00:00:45] THERAPIST: What happened in that moment?\n"
+         "[00:01:10] CLIENT: I decided to say something on Thursday and I did say it.\n")
+    out = align_session(t, duration_s=120)
+    assert out["timing_source"] == "explicit"
+    assert out["timing_warning"] is None
+    assert out["turns"][1]["start"] == 20.0
+
+
+def test_estimation_is_flagged_as_approximate():
+    """A supervisor who jumps to a wrong timestamp stops trusting all of them."""
+    from app.nlp.align import align_session
+
+    t = ("THERAPIST: How was the week?\n"
+         "CLIENT: It was hard and I went quiet again, the way I always seem to.\n")
+    out = align_session(t, duration_s=60)
+    assert out["timing_source"] == "estimated"
+    assert "estimated" in out["timing_warning"]
+
+
+def test_turn_times_are_ordered_and_cover_the_recording():
+    from app.nlp.align import align_session
+
+    t = "\n".join(
+        f"{'THERAPIST' if i % 2 == 0 else 'CLIENT'}: This is turn number {i} with some words in it."
+        for i in range(8)
+    )
+    out = align_session(t, duration_s=100)
+    starts = [x["start"] for x in out["turns"]]
+    assert starts == sorted(starts)
+    assert out["turns"][-1]["end"] <= 101
+
+
+def test_moments_are_linked_to_the_utterance_being_spoken():
+    """The whole point: a movement signal must acquire a referent."""
+    from app.nlp.align import align_session
+
+    t = ("THERAPIST: How was the week?\n"
+         "CLIENT: I don't know, it is just how my father was so it is just how I am.\n"
+         "THERAPIST: What would you want to say instead?\n"
+         "CLIENT: I decided I am going to ask for ten minutes before we talk on Tuesday.\n")
+    video = {"duration_s": 40, "signals": [
+        {"t": float(i), "gesture_amplitude": 0.5 if 10 < i < 20 else 0.05,
+         "arms_crossed": False, "posture_openness": 1.2, "head_motion": 0.02,
+         "lean": 0.0, "pose_present": True, "face_present": True}
+        for i in range(40)],
+        "moments": [{"t": 15.0, "timestamp": "00:15", "salience": 2.0}]}
+    out = align_session(t, video_result=video)
+    linked = out["linked_moments"]
+    assert len(linked) == 1
+    assert linked[0]["utterance"]          # a moment now carries words
+    assert "turn_idx" in linked[0]
+
+
+def test_alignment_without_duration_declines_rather_than_guessing():
+    from app.nlp.align import align_session
+    out = align_session("CLIENT: something happened this week.\n")
+    assert out["available"] is False

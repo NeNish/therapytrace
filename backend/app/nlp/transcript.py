@@ -34,6 +34,14 @@ LABEL_RE = re.compile(
     r"^\s*\[?\s*([A-Za-z_][A-Za-z0-9 _\-]{0,24})\s*\]?\s*[:\-–]\s*(.+)$"
 )
 
+# A leading timestamp, as emitted by Whisper, Otter, Rev and most WebVTT
+# exports: "[00:12:34] THERAPIST: ...", "(12:34) CLIENT: ...", "00:12:34 T: ...".
+# Stripped before label matching, and returned separately so M18 can use it for
+# alignment rather than discarding timing the transcript already carried.
+LEADING_TS_RE = re.compile(
+    r"^\s*[\[(]?\s*(\d{1,2}:\d{2}(?::\d{2})?)(?:\.\d+)?\s*[\])]?\s*[-–]?\s*"
+)
+
 
 @dataclass
 class Turn:
@@ -71,7 +79,8 @@ def parse_transcript(raw: str) -> ParsedTranscript:
     for line in raw.splitlines():
         if not line.strip():
             continue
-        m = LABEL_RE.match(line)
+        stripped = LEADING_TS_RE.sub("", line)
+        m = LABEL_RE.match(stripped)
         if m:
             rows.append((m.group(1), m.group(2).strip()))
         elif rows:
