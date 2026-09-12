@@ -243,6 +243,37 @@ agreement: low language score with heightened movement, or strong language with
 unusual stillness. Movement alone is noise — people shift in their seats.
 Movement coinciding with the session's lowest ownership score is worth watching.
 
+## Body language insight (M19)
+
+Turns posture and movement measurements into sentences a clinician can act on,
+anchored to a timestamp and to the words being spoken:
+
+> *"Arms stayed folded for 55 seconds from 00:40, starting as the client was
+> saying 'I don't know. It's just how my father was, so I suppose it's just how
+> I am.'"*
+
+Patterns detected, all relative to the client's **own** session baseline:
+sustained closure, sustained opening, unusual stillness, heightened movement,
+lean shifts.
+
+### What this module will not say
+
+It reports **what the body did and when**, never what the client felt. That is a
+design commitment with a test enforcing it — words like "defensive", "anxious"
+or "feels" cannot reach the output.
+
+The reason: Barrett et al. (2019) reviewed over a thousand studies and found
+people scowl when angry roughly 30% of the time, and scowl for unrelated reasons
+far more often. In therapy it is worse — clients actively manage expression in
+front of a clinician, which is the phenomenon, not noise. Commercial emotion
+systems also show documented demographic bias, a serious harm in a mental-health
+tool.
+
+So "the client is defensive" is unsupportable. "Posture closed for four minutes
+starting when they began talking about their father, and their ownership score
+was lowest in that stretch" is fully supportable — and more useful, because it
+says where to look rather than what to conclude.
+
 ## The method
 
 ### Within-person standardisation

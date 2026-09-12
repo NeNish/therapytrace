@@ -395,3 +395,39 @@ def review_aligned(payload: dict):
         duration_s=payload.get("duration_s"),
         diarisation=payload.get("diarisation"),
     )
+
+
+@router.post("/review/body")
+def review_body(payload: dict):
+    """
+    M19 — posture and movement observations from a recording, anchored to the
+    transcript.
+
+    Expects {"video_path": "...", "transcript": "...", "max_seconds": 600}.
+
+    Reports what the body did and when, never what the client felt. No emotion
+    label, mood score or affect classification is produced: facial expression
+    and posture map unreliably onto emotion, and in therapy clients actively
+    manage both.
+    """
+    from ..nlp.align import align_session
+    from ..nlp.body import body_language_insights
+    from ..nlp.review import review_session
+
+    video = payload.get("video_path")
+    if not video:
+        raise HTTPException(400, "video_path is required.")
+
+    r = review_session(video, max_seconds=payload.get("max_seconds"))
+    if not r.get("video", {}).get("available"):
+        return {"available": False, "reason": r.get("reason", "video unusable")}
+
+    aligned = None
+    if payload.get("transcript"):
+        a = align_session(
+            payload["transcript"],
+            video_result={**r["video"], "moments": r.get("moments", [])},
+        )
+        aligned = a.get("turns") if a.get("available") else None
+
+    return body_language_insights(r["video"], aligned)

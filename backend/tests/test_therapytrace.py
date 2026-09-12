@@ -564,3 +564,81 @@ def test_alignment_without_duration_declines_rather_than_guessing():
     from app.nlp.align import align_session
     out = align_session("CLIENT: something happened this week.\n")
     assert out["available"] is False
+
+
+# --------------------------------------------------------------------------
+# M19 — body language insight
+# --------------------------------------------------------------------------
+
+def _planted_signals():
+    sig = []
+    for i in range(240):
+        t = float(i)
+        crossed, still = 40 <= t <= 95, 120 <= t <= 175
+        sig.append({"t": t, "pose_present": True, "face_present": True,
+                    "arms_crossed": crossed,
+                    "posture_openness": 0.9 if crossed else 1.6,
+                    "gesture_amplitude": 0.002 if still else 0.06,
+                    "head_motion": 0.02, "lean": 0.02})
+    return {"available": True, "signals": sig, "pose_detection_rate": 1.0,
+            "summary": {"arms_crossed_ratio": 0.23, "gesture_amplitude_mean": 0.05,
+                        "gesture_amplitude_sd": 0.03, "lean_mean": 0.02}}
+
+
+def test_body_detects_a_sustained_closure_episode():
+    from app.nlp.body import body_language_insights
+    out = body_language_insights(_planted_signals())
+    assert out["available"] is True
+    kinds = [f["kind"] for f in out["findings"]]
+    assert "posture_closed" in kinds
+    ep = next(f for f in out["findings"] if f["kind"] == "posture_closed")
+    assert 50 <= ep["duration_s"] <= 60
+
+
+def test_body_anchors_findings_to_the_utterance():
+    """A posture observation is only useful if it names what was being said."""
+    from app.nlp.body import body_language_insights
+
+    turns = [{"speaker": "client", "start": 35, "end": 100,
+              "text": "It is just how my father was, so it is just how I am.",
+              "process_mean": 0.40}]
+    out = body_language_insights(_planted_signals(), turns)
+    ep = next(f for f in out["findings"] if f["kind"] == "posture_closed")
+    assert "father" in ep["sentence"]
+    assert ep["process_mean"] == 0.40
+
+
+def test_body_never_emits_an_emotion_label():
+    """The design commitment, enforced: measurement not mind-reading."""
+    from app.nlp.body import body_language_insights
+
+    out = body_language_insights(_planted_signals())
+    blob = (out["narrative"] + out["session_description"]
+            + " ".join(f["sentence"] for f in out["findings"])).lower()
+    for banned in ("defensive", "anxious", "angry", "sad", "depressed",
+                   "closed off emotionally", "feels ", "is feeling"):
+        assert banned not in blob
+    assert "no emotion label" in out["not_provided"].lower()
+
+
+def test_body_declines_when_the_subject_is_out_of_frame():
+    from app.nlp.body import body_language_insights
+
+    sig = [{"t": float(i), "pose_present": False, "arms_crossed": False,
+            "posture_openness": 0, "gesture_amplitude": 0, "head_motion": 0, "lean": 0}
+           for i in range(60)]
+    out = body_language_insights(
+        {"available": True, "signals": sig, "pose_detection_rate": 0.05, "summary": {}}
+    )
+    assert out["available"] is False
+    assert "frame" in out["reason"]
+
+
+def test_combined_brief_puts_language_first():
+    from app.nlp.body import body_language_insights, combined_insight
+
+    note = {"note": "This session scored 61, above this client's own baseline."}
+    body = body_language_insights(_planted_signals())
+    brief = combined_insight(note, body)
+    assert brief["brief"].startswith("This session scored 61")
+    assert brief["channels_used"] >= 2
