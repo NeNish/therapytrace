@@ -32,6 +32,8 @@ export const api = {
   insights: (id) => request(`/clients/${id}/insights`),
   profile: (id) => request(`/clients/${id}/profile`),
   models: () => request('/models'),
+  multimodal: (payload) =>
+    request('/sessions/multimodal', { method: 'POST', body: JSON.stringify(payload) }),
 
   addSession: (id, payload) =>
     request(`/clients/${id}/sessions`, { method: 'POST', body: JSON.stringify(payload) }),

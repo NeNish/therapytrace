@@ -5,6 +5,7 @@ import CaseTrace from './pages/CaseTrace'
 import SessionView from './pages/SessionView'
 import TherapistView from './pages/TherapistView'
 import Insights from './pages/Insights'
+import Multimodal from './pages/Multimodal'
 import Bench from './pages/Bench'
 import Method from './pages/Method'
 
@@ -16,6 +17,7 @@ export default function App() {
         <div className="rail-sub">Process monitoring</div>
         <nav>
           <NavLink to="/" end>Cases</NavLink>
+          <NavLink to="/multimodal">Multimodal</NavLink>
           <NavLink to="/bench">Bench</NavLink>
           <NavLink to="/method">How the index works</NavLink>
         </nav>
@@ -33,6 +35,7 @@ export default function App() {
           <Route path="/case/:id/insights" element={<Insights />} />
           <Route path="/session/:sid" element={<SessionView />} />
           <Route path="/bench" element={<Bench />} />
+          <Route path="/multimodal" element={<Multimodal />} />
           <Route path="/method" element={<Method />} />
         </Routes>
       </main>

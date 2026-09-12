@@ -721,3 +721,30 @@ def test_payload_carries_only_measured_values():
     assert set(p) <= {"measurements", "flags", "session_features",
                       "trajectory", "body_observations", "voice"}
     assert all(isinstance(v, (int, float)) for v in p["session_features"].values())
+
+
+def test_multimodal_endpoint_runs_on_text_alone(client):
+    """Text is primary: the other two channels must be genuinely optional."""
+    body = client.post("/api/sessions/multimodal", json={"transcript": (
+        "THERAPIST: How was the week?\n"
+        "CLIENT: I decided to tell her how I felt and I did say it, which surprised me.\n"
+    )}).json()
+    assert body["channels"]["text"]["available"] is True
+    assert body["channels"]["audio"]["available"] is False
+    assert body["channels"]["video"]["available"] is False
+    assert body["channels_active"] == 1
+    assert body["fusion"]["tpi_multimodal"] == body["fusion"]["tpi_text"]
+
+
+def test_multimodal_requires_a_transcript(client):
+    assert client.post("/api/sessions/multimodal", json={"video_path": "/x.mp4"}).status_code == 400
+
+
+def test_missing_media_degrades_only_that_channel(client):
+    body = client.post("/api/sessions/multimodal", json={
+        "transcript": "CLIENT: I decided to go and I told her why, which was hard.\n",
+        "audio_path": "/nonexistent.wav", "video_path": "/nonexistent.mp4",
+    }).json()
+    assert body["channels"]["text"]["available"] is True
+    assert body["channels"]["audio"]["available"] is False
+    assert body["channels"]["video"]["available"] is False

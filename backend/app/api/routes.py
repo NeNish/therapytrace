@@ -458,3 +458,107 @@ def generated_insight(client_id: int, db: DbSession = Depends(get_db)):
         trajectory=roll.get("trajectory"),
     )
     return {"client_code": client.code, **out}
+
+
+@router.post("/sessions/multimodal")
+def multimodal_session(payload: dict):
+    """
+    Unified three-channel analysis: transcript (required), audio and video
+    (both optional).
+
+    The transcript is primary and always analysed. Audio and video are scored
+    independently and combined at the decision layer with bounded influence —
+    on our own data, coarse timing features reduced text-only accuracy
+    (AUC 0.624 -> 0.567), so they modify the index rather than voting on it.
+    Each channel reports its own availability, so a missing file degrades that
+    channel alone and never the analysis as a whole.
+
+    Expects {"transcript": "...", "audio_path": "...", "video_path": "...",
+             "max_seconds": 600}.
+    """
+    from ..nlp.acoustic import extract_acoustic
+    from ..nlp.align import align_session
+    from ..nlp.body import body_language_insights, combined_insight
+    from ..nlp.multimodal import fuse
+    from ..nlp.narrative import session_note
+    from ..nlp.pipeline import analyse_session
+    from ..nlp.review import review_session
+
+    transcript = payload.get("transcript")
+    if not transcript or len(transcript.strip()) < 20:
+        raise HTTPException(400, "A transcript is required — it is the primary channel.")
+
+    # ---- channel 1: text (always) ------------------------------------
+    text = analyse_session(transcript)
+    note = session_note(text)
+    channels = {
+        "text": {
+            "available": True,
+            "tpi": text["score"]["tpi"],
+            "confidence": text["score"]["confidence"],
+            "features": text["features"],
+            "n_client_turns": text["parse"]["n_client_turns"],
+            "role": "primary — the only channel validated against expert annotation",
+        }
+    }
+
+    # ---- channel 2: audio (optional) ---------------------------------
+    acoustic = None
+    if payload.get("audio_path"):
+        f = extract_acoustic(payload["audio_path"])
+        if f:
+            acoustic = {"available": True, "session_mean": f, "n_segments": 1}
+            channels["audio"] = {
+                "available": True,
+                "n_features": len([k for k in f if isinstance(f[k], (int, float))]),
+                "f0_mean": f.get("f0_mean"),
+                "pause_ratio": f.get("pause_ratio"),
+                "syllable_rate": f.get("syllable_rate"),
+                "role": "supporting — bounded modifier, max ±4 index points",
+            }
+        else:
+            channels["audio"] = {"available": False, "reason": "audio unreadable"}
+    else:
+        channels["audio"] = {"available": False, "reason": "no audio supplied"}
+
+    # ---- channel 3: video (optional) ---------------------------------
+    video = body = aligned = None
+    if payload.get("video_path"):
+        r = review_session(payload["video_path"], max_seconds=payload.get("max_seconds"))
+        if r.get("video", {}).get("available"):
+            video = {**r["video"], "moments": r.get("moments", [])}
+            a = align_session(transcript, video_result=video)
+            aligned = a.get("turns") if a.get("available") else None
+            body = body_language_insights(video, aligned)
+            channels["video"] = {
+                "available": True,
+                "pose_detection_rate": video["pose_detection_rate"],
+                "face_detection_rate": video["face_detection_rate"],
+                "duration_s": video["duration_s"],
+                "n_findings": (body or {}).get("n_findings", 0),
+                "timing_source": a.get("timing_source"),
+                "role": "supporting — navigation and posture observation, no emotion inference",
+            }
+        else:
+            channels["video"] = {"available": False, "reason": r.get("reason", "video unusable")}
+    else:
+        channels["video"] = {"available": False, "reason": "no video supplied"}
+
+    fusion = fuse(text["score"]["tpi"], acoustic, None, text["score"]["confidence"])
+    brief = combined_insight(note, body, acoustic)
+
+    return {
+        "channels": channels,
+        "channels_active": sum(1 for c in channels.values() if c.get("available")),
+        "fusion": fusion,
+        "brief": brief,
+        "body": body,
+        "moments": (video or {}).get("moments", []),
+        "aligned_turns": (aligned or [])[:60],
+        "principle": (
+            "Text is primary and always analysed. Audio and video are optional "
+            "and enter as bounded modifiers, because on this project's own data "
+            "they did not improve measurement accuracy. Each channel degrades "
+            "independently."
+        ),
+    }

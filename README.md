@@ -308,6 +308,27 @@ rather than silent.
 
 Enable with `ANTHROPIC_API_KEY`; the system runs unchanged without one.
 
+## Three channels, one page
+
+`/multimodal` in the interface, `POST /api/sessions/multimodal` in the API.
+
+| Channel | Required | Contributes |
+|---|---|---|
+| **Text** — transcript | **Yes** | The score, curve, note and recommendation |
+| **Audio** — .wav path | No | 48 acoustic features; bounded modifier, max ±4 index points |
+| **Video** — .mp4 path | No | Posture findings, moments worth reviewing, annotated output |
+
+The page shows all three side by side with their live status, then a combined
+brief in three sections — *what was said*, *what the body did*, *how it
+sounded* — and the fused index next to the text-only index, so the contribution
+of each extra channel is visible rather than buried.
+
+Text is marked primary in the interface for a reason that is on the record:
+tested against text alone, coarse timing features **reduced** accuracy
+(AUC 0.624 → 0.567). Audio and video therefore modify the index rather than
+voting on it, and each degrades independently — a missing file disables that
+channel and nothing else.
+
 ## The method
 
 ### Within-person standardisation
