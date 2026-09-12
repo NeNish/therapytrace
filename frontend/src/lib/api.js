@@ -29,6 +29,9 @@ export const api = {
 
   trajectory: (id) => request(`/clients/${id}/trajectory`),
   therapistImpact: (id) => request(`/clients/${id}/therapist-impact`),
+  insights: (id) => request(`/clients/${id}/insights`),
+  profile: (id) => request(`/clients/${id}/profile`),
+  models: () => request('/models'),
 
   addSession: (id, payload) =>
     request(`/clients/${id}/sessions`, { method: 'POST', body: JSON.stringify(payload) }),

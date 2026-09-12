@@ -4,6 +4,7 @@ import Cases from './pages/Cases'
 import CaseTrace from './pages/CaseTrace'
 import SessionView from './pages/SessionView'
 import TherapistView from './pages/TherapistView'
+import Insights from './pages/Insights'
 import Bench from './pages/Bench'
 import Method from './pages/Method'
 
@@ -29,6 +30,7 @@ export default function App() {
           <Route path="/" element={<Cases />} />
           <Route path="/case/:id" element={<CaseTrace />} />
           <Route path="/case/:id/therapist" element={<TherapistView />} />
+          <Route path="/case/:id/insights" element={<Insights />} />
           <Route path="/session/:sid" element={<SessionView />} />
           <Route path="/bench" element={<Bench />} />
           <Route path="/method" element={<Method />} />

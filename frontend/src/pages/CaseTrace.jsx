@@ -330,6 +330,7 @@ export default function CaseTrace() {
       </div>
 
       <div className="row" style={{ marginTop: 8 }}>
+        <Link className="btn" to={`/case/${id}/insights`}>Insights & recommendation →</Link>
         <Link className="btn ghost" to={`/case/${id}/therapist`}>Therapist contribution →</Link>
       </div>
     </>
