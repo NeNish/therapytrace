@@ -32,6 +32,11 @@ export const api = {
   insights: (id) => request(`/clients/${id}/insights`),
   profile: (id) => request(`/clients/${id}/profile`),
   models: () => request('/models'),
+  uploadMedia: (file) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return request('/upload/media', { method: 'POST', body: fd })
+  },
   multimodal: (payload) =>
     request('/sessions/multimodal', { method: 'POST', body: JSON.stringify(payload) }),
 

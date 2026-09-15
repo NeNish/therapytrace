@@ -38,8 +38,21 @@ export default function Multimodal() {
   const [audioPath, setAudioPath] = useState('')
   const [videoPath, setVideoPath] = useState('')
   const [out, setOut] = useState(null)
+  const [audioInfo, setAudioInfo] = useState(null)
+  const [videoInfo, setVideoInfo] = useState(null)
+  const [uploading, setUploading] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
+
+  const upload = async (file, kind) => {
+    if (!file) return
+    setUploading(kind); setError(null)
+    try {
+      const info = await api.uploadMedia(file)
+      if (kind === 'video') { setVideoPath(info.path); setVideoInfo(info) }
+      else { setAudioPath(info.path); setAudioInfo(info) }
+    } catch (e) { setError(e.message) } finally { setUploading(null) }
+  }
 
   const run = async () => {
     setBusy(true); setError(null)
@@ -77,25 +90,40 @@ export default function Multimodal() {
 
         <Channel tag="CHANNEL 2" title="Audio"
                  role="Pitch, pauses, vocal effort. 48 features per utterance.">
-          <div className="field">
-            <label htmlFor="ap">Path to .wav on the server</label>
-            <input id="ap" placeholder="/data/session_04.wav" value={audioPath}
-                   onChange={(e) => setAudioPath(e.target.value)} />
-          </div>
-          <p className="small muted">
-            Optional. Leave blank and the analysis runs on text alone.
+          <label htmlFor="af" className="btn ghost"
+                 style={{ cursor: 'pointer', display: 'block', textAlign: 'center' }}>
+            {uploading === 'audio' ? 'Uploading…' : 'Choose an audio file'}
+          </label>
+          <input id="af" type="file" accept="audio/*,.wav,.mp3,.m4a" className="sr-only"
+                 onChange={(e) => upload(e.target.files?.[0], 'audio')} />
+          {audioInfo && (
+            <p className="mono small" style={{ marginTop: 8, color: 'var(--gain)' }}>
+              {audioInfo.filename} · {audioInfo.size_mb} MB
+            </p>
+          )}
+          <p className="small muted" style={{ marginTop: 8 }}>
+            Optional. .wav, .mp3 or .m4a. Leave blank to run on text alone.
           </p>
         </Channel>
 
         <Channel tag="CHANNEL 3" title="Video"
                  role="Posture, movement, gaze. Observation only — no emotion label.">
-          <div className="field">
-            <label htmlFor="vp">Path to .mp4 on the server</label>
-            <input id="vp" placeholder="/data/session_04.mp4" value={videoPath}
-                   onChange={(e) => setVideoPath(e.target.value)} />
-          </div>
-          <p className="small muted">
-            Optional. Adds posture findings and moments worth reviewing.
+          <label htmlFor="vf" className="btn ghost"
+                 style={{ cursor: 'pointer', display: 'block', textAlign: 'center' }}>
+            {uploading === 'video' ? 'Uploading…' : 'Choose a video file'}
+          </label>
+          <input id="vf" type="file" accept="video/*,.mp4,.mov,.m4v" className="sr-only"
+                 onChange={(e) => upload(e.target.files?.[0], 'video')} />
+          {videoInfo && (
+            <p className="mono small" style={{ marginTop: 8, color: 'var(--gain)' }}>
+              {videoInfo.filename} · {videoInfo.duration_s}s · {videoInfo.resolution}
+              {videoInfo.warning && (
+                <span style={{ color: 'var(--regress)' }}> · {videoInfo.warning}</span>
+              )}
+            </p>
+          )}
+          <p className="small muted" style={{ marginTop: 8 }}>
+            Optional. .mp4 or .mov, straight from a phone. First 30 seconds are analysed.
           </p>
         </Channel>
       </div>

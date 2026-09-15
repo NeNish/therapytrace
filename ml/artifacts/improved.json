@@ -1,0 +1,23 @@
+{
+  "binary_change_sustain": {
+    "cv_acc": 0.6924496695709019,
+    "cv_macro_f1": 0.6644231665737477,
+    "test_acc": 0.6484018264840182,
+    "test_macro_f1": 0.6208857913669065,
+    "n": 2211,
+    "config": "C=1.0 chars=True"
+  },
+  "therapist_3class": {
+    "cv_acc": 0.7693389968438175,
+    "cv_macro_f1": 0.7457480187934447,
+    "test_acc": 0.7465057179161372,
+    "test_macro_f1": 0.7369049380491551,
+    "n": 4552,
+    "config": "C=1.0 chars=True"
+  },
+  "question_binary": {
+    "cv_acc": 0.8633113359979084,
+    "cv_macro_f1": 0.8518898724645059,
+    "n": 5078
+  }
+}

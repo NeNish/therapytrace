@@ -329,6 +329,22 @@ tested against text alone, coarse timing features **reduced** accuracy
 voting on it, and each degrades independently — a missing file disables that
 channel and nothing else.
 
+## Live demonstration with a recording
+
+The Multimodal page has file pickers, not path boxes — record on a phone, upload,
+analyse. Verified end to end:
+
+| | |
+|---|---|
+| Formats | `.mp4`, `.mov` (iPhone default), `.m4v`, `.avi`; `.wav`, `.mp3`, `.m4a` |
+| Processing | 30-second clip in 4–8 seconds on CPU |
+| Analysed | First 30 seconds by default, so a long recording never stalls a demo |
+| Storage | Temp directory only — nothing is retained after the session |
+
+Framing matters: the subject must be reasonably close and facing the camera.
+Distant or side-on footage gives 0% pose detection, which is a measured
+constraint rather than an assumption.
+
 ## The method
 
 ### Within-person standardisation

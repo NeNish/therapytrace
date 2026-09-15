@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 import tempfile
 
 import pytest
@@ -748,3 +749,27 @@ def test_missing_media_degrades_only_that_channel(client):
     assert body["channels"]["text"]["available"] is True
     assert body["channels"]["audio"]["available"] is False
     assert body["channels"]["video"]["available"] is False
+
+
+def test_media_upload_returns_a_usable_path(client, tmp_path):
+    """On-the-spot demo path: upload a recording, get back what analysis needs."""
+    import cv2, numpy as np
+
+    src = tmp_path / "rec.mp4"
+    vw = cv2.VideoWriter(str(src), cv2.VideoWriter_fourcc(*"mp4v"), 10, (160, 120))
+    for _ in range(20):
+        vw.write(np.full((120, 160, 3), 180, np.uint8))
+    vw.release()
+
+    with src.open("rb") as f:
+        body = client.post("/api/upload/media", files={"file": ("rec.mp4", f, "video/mp4")}).json()
+    assert body["kind"] == "video"
+    assert Path(body["path"]).exists()
+    assert body["size_mb"] >= 0
+
+
+def test_upload_rejects_unsupported_types(client):
+    import io
+    r = client.post("/api/upload/media",
+                    files={"file": ("notes.txt", io.BytesIO(b"hello"), "text/plain")})
+    assert r.status_code == 400

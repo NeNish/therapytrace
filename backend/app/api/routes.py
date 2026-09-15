@@ -562,3 +562,58 @@ def multimodal_session(payload: dict):
             "independently."
         ),
     }
+
+
+@router.post("/upload/media")
+async def upload_media(file: UploadFile = File(...)):
+    """
+    Accept a recording from the browser and return the server-side path the
+    analysis endpoints expect.
+
+    Exists so a session can be recorded and analysed without anyone typing a
+    filesystem path. Files land in a temp directory that the OS clears; nothing
+    is retained, which also keeps a recording made during a demonstration from
+    persisting anywhere.
+    """
+    import shutil
+    import tempfile
+    from pathlib import Path as _P
+
+    suffix = _P(file.filename or "clip.mp4").suffix.lower()
+    if suffix not in {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm",
+                      ".wav", ".mp3", ".m4a", ".flac"}:
+        raise HTTPException(400, f"Unsupported file type: {suffix}")
+
+    tmp_dir = _P(tempfile.gettempdir()) / "therapytrace_media"
+    tmp_dir.mkdir(exist_ok=True)
+    dest = tmp_dir / f"upload_{abs(hash(file.filename or 'clip'))}{suffix}"
+
+    with dest.open("wb") as out:
+        shutil.copyfileobj(file.file, out)
+
+    size_mb = dest.stat().st_size / 1e6
+    kind = "audio" if suffix in {".wav", ".mp3", ".m4a", ".flac"} else "video"
+
+    info = {"path": str(dest), "kind": kind, "size_mb": round(size_mb, 2),
+            "filename": file.filename}
+
+    if kind == "video":
+        try:
+            import cv2
+
+            cap = cv2.VideoCapture(str(dest))
+            if cap.isOpened():
+                fps = cap.get(cv2.CAP_PROP_FPS) or 0
+                frames = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0
+                info["duration_s"] = round(frames / fps, 1) if fps else None
+                info["resolution"] = (
+                    f"{int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))}"
+                    f"x{int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))}"
+                )
+            else:
+                info["warning"] = "File uploaded but could not be decoded."
+            cap.release()
+        except Exception:
+            info["warning"] = "Could not inspect the video."
+
+    return info
