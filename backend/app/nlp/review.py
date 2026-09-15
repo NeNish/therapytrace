@@ -46,7 +46,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import numpy as np
+try:
+    import numpy as np
+except ImportError:  # multimodal extras absent; these modules self-disable
+    np = None
 
 # MediaPipe Pose landmark indices
 NOSE = 0

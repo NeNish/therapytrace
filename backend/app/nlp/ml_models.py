@@ -31,8 +31,6 @@ import functools
 from pathlib import Path
 from typing import Any
 
-import pandas as pd
-
 ARTIFACTS = Path(__file__).resolve().parents[3] / "ml" / "artifacts"
 
 CLIENT_MODEL = ARTIFACTS / "model_client.joblib"
@@ -65,7 +63,14 @@ def available() -> dict[str, bool]:
     }
 
 
-def _frame(texts: list[str], prev: list[str] | None = None) -> pd.DataFrame:
+def _frame(texts: list[str], prev: list[str] | None = None):
+    """
+    Built lazily so that pandas is only required when a trained model is
+    actually being used. The text pipeline must start on a machine that has
+    never installed the ML stack.
+    """
+    import pandas as pd
+
     prev = prev or [""] * len(texts)
     return pd.DataFrame({"text": texts, "prev_text": prev})
 

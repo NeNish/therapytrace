@@ -33,7 +33,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import numpy as np
+try:
+    import numpy as np
+except ImportError:  # multimodal extras absent; these modules self-disable
+    np = None
 
 # canonical landmark indices in MediaPipe Face Mesh
 L_EYE = [33, 160, 158, 133, 153, 144]

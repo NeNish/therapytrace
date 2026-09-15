@@ -49,7 +49,10 @@ from __future__ import annotations
 
 from typing import Any
 
-import numpy as np
+try:
+    import numpy as np
+except ImportError:  # multimodal extras absent; these modules self-disable
+    np = None
 
 MIN_EPISODE_S = 20.0   # shorter than this is a shift in the chair, not a pattern
 Z_STRONG = 1.2

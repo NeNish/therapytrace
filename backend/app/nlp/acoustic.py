@@ -42,7 +42,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import numpy as np
+try:
+    import numpy as np
+except ImportError:  # multimodal extras absent; these modules self-disable
+    np = None
 
 SR = 16_000
 MIN_PAUSE_S = 0.25

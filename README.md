@@ -109,6 +109,19 @@ programmed trajectories — improving, plateauing, relapsing, late breakthrough 
 each with 10–12 sessions and matching PHQ-9 scores. It's the fastest way to see
 what a trace does and to confirm the pipeline recovers a known signal.
 
+### If the backend fails to start
+
+`run.ps1` verifies the app imports before launching, and prints the real error
+if it cannot. The usual cause is an incomplete install:
+
+```powershell
+backend\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+```
+
+The multimodal packages (`librosa`, `opencv-python-headless`, `mediapipe`) are
+optional at runtime — those modules report "not available" and the text pipeline
+is unaffected if they are missing.
+
 ### Tests
 
 ```bash

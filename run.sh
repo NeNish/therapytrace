@@ -16,6 +16,12 @@ if [ ! -d frontend/node_modules ]; then
   (cd frontend && npm install)
 fi
 
+if ! backend/.venv/bin/python -c "from app.main import app" 2>/tmp/tt_import.log; then
+  echo "The backend could not start:"; cat /tmp/tt_import.log
+  echo; echo "Try: backend/.venv/bin/pip install -r backend/requirements.txt"
+  exit 1
+fi
+
 trap 'kill 0' EXIT
 (cd backend && .venv/bin/uvicorn app.main:app --reload --port 8000) &
 (cd frontend && npm run dev) &

@@ -29,6 +29,22 @@ if (-not (Test-Path "backend\.venv")) {
     & backend\.venv\Scripts\python.exe -m pip install --quiet -r backend\requirements.txt
 }
 
+# Verify the app actually imports before starting uvicorn. A missing package
+# otherwise surfaces as a truncated traceback inside the reloader, which is
+# hard to read and easy to miss.
+Write-Host "Checking dependencies..." -ForegroundColor Cyan
+Push-Location backend
+& .\.venv\Scripts\python.exe -c "from app.main import app" 2>&1 | Tee-Object -Variable importCheck | Out-Null
+$importOk = $LASTEXITCODE -eq 0
+Pop-Location
+if (-not $importOk) {
+    Write-Host "The backend could not start. Error:" -ForegroundColor Red
+    Write-Host $importCheck
+    Write-Host ""
+    Write-Host "Try: backend\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt"
+    exit 1
+}
+
 # --- frontend packages -----------------------------------------------------
 if (-not (Test-Path "frontend\node_modules")) {
     Write-Host "Installing frontend packages..." -ForegroundColor Cyan
