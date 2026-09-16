@@ -735,10 +735,36 @@ def test_multimodal_endpoint_runs_on_text_alone(client):
     assert body["channels"]["video"]["available"] is False
     assert body["channels_active"] == 1
     assert body["fusion"]["tpi_multimodal"] == body["fusion"]["tpi_text"]
+    # Standalone scoring uses language content, not a self-baseline that pins at 50.
+    assert body["fusion"]["tpi_text"] != 50.0
+    assert body["insights"]["text"]["available"] is True
 
 
-def test_multimodal_requires_a_transcript(client):
-    assert client.post("/api/sessions/multimodal", json={"video_path": "/x.mp4"}).status_code == 400
+def test_multimodal_accepts_video_without_transcript(client):
+    """Video-only mode is allowed; missing files degrade that channel alone."""
+    body = client.post("/api/sessions/multimodal", json={"video_path": "/x.mp4"}).json()
+    assert body["input_mode"] == "video_only"
+    assert body["channels"]["text"]["available"] is False
+    assert body["channels"]["video"]["available"] is False
+
+
+def test_multimodal_requires_some_input(client):
+    assert client.post("/api/sessions/multimodal", json={}).status_code == 400
+
+
+def test_absolute_process_index_not_pinned_at_fifty():
+    from app.nlp.features import session_features
+    from app.nlp.scoring import score_session_standalone
+
+    text = (
+        "I decided to tell her directly. I feel resentful and ashamed, but I know "
+        "my part is that I go quiet and punish him for it. Next week I will try "
+        "saying what I need before I get furious."
+    )
+    feats, _ = session_features([text] * 4)
+    scored = score_session_standalone(feats)
+    assert scored["tpi"] != 50.0
+    assert scored["scoring_mode"] == "absolute"
 
 
 def test_missing_media_degrades_only_that_channel(client):

@@ -14,6 +14,11 @@ export default function CaseTrace() {
   const [transcript, setTranscript] = useState('')
   const [busy, setBusy] = useState(false)
   const [measure, setMeasure] = useState({ session_number: '', instrument: 'PHQ-9', score: '' })
+  const [audioPath, setAudioPath] = useState('')
+  const [videoPath, setVideoPath] = useState('')
+  const [audioInfo, setAudioInfo] = useState(null)
+  const [videoInfo, setVideoInfo] = useState(null)
+  const [uploading, setUploading] = useState(null)
   const fileRef = useRef(null)
 
   const load = useCallback(
@@ -23,6 +28,16 @@ export default function CaseTrace() {
 
   useEffect(() => { load() }, [load])
 
+  const uploadMedia = async (file, kind) => {
+    if (!file) return
+    setUploading(kind); setError(null)
+    try {
+      const info = await api.uploadMedia(file)
+      if (kind === 'video') { setVideoPath(info.path); setVideoInfo(info) }
+      else { setAudioPath(info.path); setAudioInfo(info) }
+    } catch (e) { setError(e.message) } finally { setUploading(null) }
+  }
+
   const addSession = async (e) => {
     e.preventDefault()
     if (transcript.trim().length < 20) {
@@ -31,8 +46,16 @@ export default function CaseTrace() {
     }
     setBusy(true); setError(null)
     try {
-      await api.addSession(id, { transcript })
+      await api.addSession(id, {
+        transcript,
+        audio_path: audioPath || undefined,
+        video_path: videoPath || undefined,
+      })
       setTranscript('')
+      setAudioPath('')
+      setVideoPath('')
+      setAudioInfo(null)
+      setVideoInfo(null)
       await load()
     } catch (e) { setError(e.message) } finally { setBusy(false) }
   }
@@ -81,6 +104,16 @@ export default function CaseTrace() {
       </p>
 
       {error && <div className="notice">{error}</div>}
+
+      {sessions.length > 0 && sessions[sessions.length - 1].confidence < 0.55 && (
+        <div className="notice">
+          Session {sessions[sessions.length - 1].session_number} has{' '}
+          {(sessions[sessions.length - 1].confidence * 100).toFixed(0)}% confidence
+          because it is short ({sessions[sessions.length - 1].features?.n_client_words ?? '—'} client words).
+          The index needs roughly 300+ client words and 10+ turns for a reliable score.
+          Add a fuller transcript or treat this session as exploratory.
+        </div>
+      )}
 
       {/* ---------------- the trace ---------------- */}
       <div className="panel">
@@ -267,7 +300,14 @@ export default function CaseTrace() {
                   <td className="num" style={{ color: delta > 0 ? 'var(--gain)' : delta < 0 ? 'var(--regress)' : 'var(--ink-3)' }}>
                     {delta == null ? '—' : `${delta > 0 ? '+' : ''}${delta.toFixed(1)}`}
                   </td>
-                  <td className="num">{(s.confidence * 100).toFixed(0)}%</td>
+                  <td className="num" title={
+                    s.confidence < 0.55
+                      ? 'Low confidence — short session or fewer than 300 client words'
+                      : ''
+                  } style={{ color: s.confidence < 0.55 ? 'var(--regress)' : undefined }}>
+                    {(s.confidence * 100).toFixed(0)}%
+                    {s.confidence < 0.55 && ' ⚠'}
+                  </td>
                   <td className="num">{s.features?.n_client_words ?? '—'}</td>
                   <td className="small muted">open →</td>
                 </tr>
@@ -281,16 +321,41 @@ export default function CaseTrace() {
         <form className="panel" onSubmit={addSession}>
           <h2>Add a session</h2>
           <p className="small muted" style={{ marginTop: -6 }}>
-            Paste a speaker-labelled transcript. THERAPIST: / CLIENT: works, so
-            do T:, C:, Counselor:, Patient: and diarised SPEAKER_00 labels.
+            Paste a speaker-labelled transcript. Optionally attach audio and/or
+            video from the same session for posture and vocal insights.
+            Sessions under 300 client words score with reduced confidence.
           </p>
           <div className="field">
             <label htmlFor="tr">Transcript</label>
             <textarea
-              id="tr" rows={9} value={transcript}
+              id="tr" rows={7} value={transcript}
               placeholder={'THERAPIST: How has the week been?\nCLIENT: ...'}
               onChange={(e) => setTranscript(e.target.value)}
             />
+          </div>
+          <div className="grid-2" style={{ gap: 10, marginBottom: 12 }}>
+            <div>
+              <label htmlFor="sess-audio" className="btn ghost small"
+                     style={{ cursor: 'pointer', display: 'block', textAlign: 'center' }}>
+                {uploading === 'audio' ? 'Uploading…' : 'Attach audio (optional)'}
+              </label>
+              <input id="sess-audio" type="file" accept="audio/*,.wav,.mp3,.m4a" className="sr-only"
+                     onChange={(e) => uploadMedia(e.target.files?.[0], 'audio')} />
+              {audioInfo && (
+                <p className="mono small muted" style={{ marginTop: 4 }}>{audioInfo.filename}</p>
+              )}
+            </div>
+            <div>
+              <label htmlFor="sess-video" className="btn ghost small"
+                     style={{ cursor: 'pointer', display: 'block', textAlign: 'center' }}>
+                {uploading === 'video' ? 'Uploading…' : 'Attach video (optional)'}
+              </label>
+              <input id="sess-video" type="file" accept="video/*,.mp4,.mov,.m4v" className="sr-only"
+                     onChange={(e) => uploadMedia(e.target.files?.[0], 'video')} />
+              {videoInfo && (
+                <p className="mono small muted" style={{ marginTop: 4 }}>{videoInfo.filename}</p>
+              )}
+            </div>
           </div>
           <div className="row">
             <button type="submit" disabled={busy}>{busy ? 'Scoring…' : 'Score session'}</button>

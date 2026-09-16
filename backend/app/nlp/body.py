@@ -57,6 +57,41 @@ except ImportError:  # multimodal extras absent; these modules self-disable
 MIN_EPISODE_S = 20.0   # shorter than this is a shift in the chair, not a pattern
 Z_STRONG = 1.2
 
+SUPERVISION_QUESTIONS = {
+    "posture_closed": (
+        "Arms stayed folded for a sustained stretch. What was being discussed? "
+        "Ask whether closure coincided with a topic the client finds hard to own — "
+        "not whether they were 'being defensive'."
+    ),
+    "posture_opened": (
+        "Posture opened relative to this person's own baseline. Did this coincide "
+        "with naming a plan, a feeling precisely, or taking partial responsibility?"
+    ),
+    "stillness": (
+        "Unusual stillness — in the room, did this feel like deep processing or "
+        "withdrawal? The recording shows movement; only the therapist knows which."
+    ),
+    "heightened_movement": (
+        "Movement rose sharply. Was the client working out a next step, reacting "
+        "to something said, or shifting to a more charged topic?"
+    ),
+    "lean_shift": (
+        "Torso angle changed mid-recording. Did the relational dynamic or topic "
+        "shift at the same point? Worth locating in the full session."
+    ),
+    "head_motion_spike": (
+        "Head movement peaked here — often marks a topic shift or internal "
+        "re-orientation. What was the client saying or hearing at this second?"
+    ),
+}
+
+
+def _supervision_for(kind: str) -> str:
+    return SUPERVISION_QUESTIONS.get(
+        kind,
+        "Locate this moment in the recording and ask what was happening relationally.",
+    )
+
 
 def _clock(s: float) -> str:
     return f"{int(s // 60):02d}:{int(s % 60):02d}"
@@ -153,6 +188,11 @@ def body_language_insights(
             ),
             "utterance": u["text"][:200] if u else None,
             "process_mean": u.get("process_mean") if u else None,
+            "supervision_question": _supervision_for("posture_closed"),
+            "clinical_note": (
+                "Sustained arm folding — measure posture, not mood. "
+                "Use the timestamp to find the topic, then ask the client."
+            ),
         })
 
     # ---- sustained opening ------------------------------------------
@@ -171,6 +211,8 @@ def body_language_insights(
                 + "."
             ),
             "utterance": u["text"][:200] if u else None,
+            "supervision_question": _supervision_for("posture_opened"),
+            "clinical_note": "Posture opened — check whether language moved toward agency or planning.",
         })
 
     # ---- stillness ---------------------------------------------------
@@ -190,6 +232,8 @@ def body_language_insights(
                   "processing as disengagement."
             ),
             "utterance": u["text"][:200] if u else None,
+            "supervision_question": _supervision_for("stillness"),
+            "clinical_note": "Stillness can mean processing or disengagement — context decides.",
         })
 
     # ---- agitation ---------------------------------------------------
@@ -208,6 +252,53 @@ def body_language_insights(
                 + "."
             ),
             "utterance": u["text"][:200] if u else None,
+            "supervision_question": _supervision_for("heightened_movement"),
+            "clinical_note": "Heightened movement — note whether speech rate or pitch also shifted.",
+        })
+
+    # ---- lean shift --------------------------------------------------
+    lean_vals = [s.get("lean", 0.0) for s in usable]
+    if len(lean_vals) >= 20:
+        mid = len(lean_vals) // 2
+        early, late = lean_vals[:mid], lean_vals[mid:]
+        early_m, late_m = float(np.mean(early)), float(np.mean(late))
+        if abs(late_m - early_m) > 0.08:
+            direction = "toward" if late_m > early_m else "away from"
+            u = _utterance_at(usable[mid]["t"], client_turns)
+            findings.append({
+                "kind": "lean_shift",
+                "start": usable[mid]["t"], "timestamp": _clock(usable[mid]["t"]),
+                "duration_s": round(usable[-1]["t"] - usable[mid]["t"], 1),
+                "sentence": (
+                    f"From {_clock(usable[mid]['t'])} onward the torso angled more "
+                    f"{direction} the camera than in the first half"
+                    + (f", as the client was saying \u201c{u['text'][:90]}\u2026\u201d" if u else "")
+                    + "."
+                ),
+                "utterance": u["text"][:200] if u else None,
+                "supervision_question": _supervision_for("lean_shift"),
+                "clinical_note": "Lean shift — relational distance may have changed; verify in session.",
+            })
+
+    # ---- head motion spike -------------------------------------------
+    head_vals = np.array([s.get("head_motion", 0.0) for s in usable], dtype=float)
+    head_sd = float(head_vals.std()) or 1e-6
+    spike_idx = int(np.argmax(head_vals))
+    if head_vals[spike_idx] > head_mu + 2.0 * head_sd and spike_idx > 2:
+        u = _utterance_at(usable[spike_idx]["t"], client_turns)
+        findings.append({
+            "kind": "head_motion_spike",
+            "start": usable[spike_idx]["t"],
+            "timestamp": _clock(usable[spike_idx]["t"]),
+            "duration_s": 0.0,
+            "sentence": (
+                f"Head movement peaked at {_clock(usable[spike_idx]['t'])}"
+                + (f" while the client was saying \u201c{u['text'][:90]}\u2026\u201d" if u else "")
+                + " — the sharpest shift in the recording."
+            ),
+            "utterance": u["text"][:200] if u else None,
+            "supervision_question": _supervision_for("head_motion_spike"),
+            "clinical_note": "Head movement spike — often marks re-orientation; locate topic in recording.",
         })
 
     findings.sort(key=lambda f: f["start"])
@@ -234,14 +325,40 @@ def body_language_insights(
             f"{video_result['pose_detection_rate']:.0%} of the recording."
         )
 
+    engagement = "steady"
+    if len(usable) >= 10:
+        move_series = np.array([s.get("gesture_amplitude", 0.0) for s in usable], dtype=float)
+        first_third = float(move_series[: len(move_series) // 3].mean())
+        last_third = float(move_series[-len(move_series) // 3 :].mean())
+        if last_third > first_third * 1.4:
+            engagement = "increasing_movement"
+            overall.append("Movement built across the clip — more animated toward the end.")
+        elif last_third < first_third * 0.6:
+            engagement = "decreasing_movement"
+            overall.append("Movement tapered across the clip — quieter toward the end.")
+
+    supervision_prompts = [_supervision_for(f["kind"]) for f in findings[:4]]
+    if engagement == "increasing_movement":
+        supervision_prompts.append(
+            "Movement built across the clip. Did the session move toward planning "
+            "or toward agitation? Compare with what was said if a transcript exists."
+        )
+    elif engagement == "decreasing_movement":
+        supervision_prompts.append(
+            "Movement tapered toward the end. Closing-down can mean integration "
+            "or fatigue — only the therapist in the room can distinguish them."
+        )
+
     return {
         "available": True,
         "n_findings": len(findings),
         "findings": findings,
+        "engagement_arc": engagement,
+        "supervision_prompts": supervision_prompts,
         "session_description": " ".join(overall) or
             "Posture and movement stayed within this client's usual range throughout.",
         "narrative": (
-            " ".join(f["sentence"] for f in findings[:4])
+            " ".join(f["sentence"] for f in findings[:5])
             if findings else
             "No sustained postural or movement pattern stood out from this "
             "client's own baseline in this recording."

@@ -138,6 +138,25 @@ def confidence(features: dict[str, float], baseline: Baseline) -> tuple[float, l
     return round(min(1.0, conf), 3), notes
 
 
+def absolute_process_index(
+    features: dict[str, float], weights: dict[str, float] | None = None
+) -> tuple[float, dict[str, float]]:
+    """
+    Standalone process score when no client baseline exists yet.
+
+    Maps the weighted mean of raw dimension scores (0–1) to the same 0–100
+    scale: 50 means neutral language on every dimension, higher means more
+    therapeutic process markers in the text itself.
+    """
+    w = weights or DEFAULT_WEIGHTS
+    weighted = sum(w[d] * features.get(d, 0.5) for d in DIMENSIONS)
+    contributions = {
+        d: round(100.0 * w[d] * features.get(d, 0.5), 3) for d in DIMENSIONS
+    }
+    tpi = round(max(0.0, min(100.0, 100.0 * weighted)), 2)
+    return tpi, contributions
+
+
 def score_session(
     features: dict[str, float],
     baseline: Baseline,
@@ -152,4 +171,26 @@ def score_session(
         "contributions": contrib,
         "confidence": conf,
         "confidence_notes": notes,
+    }
+
+
+def score_session_standalone(
+    features: dict[str, float], weights: dict[str, float] | None = None
+) -> dict:
+    """Score a single session with no prior history — used by the multimodal page."""
+    tpi, contrib = absolute_process_index(features, weights)
+    conf, notes = confidence(features, Baseline(
+        means={d: 0.5 for d in DIMENSIONS},
+        sds=COHORT_SD,
+        n_sessions=0,
+        provisional=True,
+    ))
+    notes.insert(0, "No client baseline yet — score reflects language content, not change from prior sessions.")
+    return {
+        "tpi": tpi,
+        "z": {d: round((features.get(d, 0.5) - 0.5) / COHORT_SD[d], 4) for d in DIMENSIONS},
+        "contributions": contrib,
+        "confidence": conf,
+        "confidence_notes": notes,
+        "scoring_mode": "absolute",
     }

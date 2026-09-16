@@ -41,6 +41,7 @@ not comparable between people.
 
 from __future__ import annotations
 
+import base64
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -332,14 +333,94 @@ def render_annotated_video(
     return {"available": True, "output": str(output_path), "frames_written": idx}
 
 
-def find_moments(analysis: dict, audio_summary: dict | None = None, k: int = 5) -> list[dict]:
-    """
-    The actually useful output: timestamps where several channels changed at
-    once. A supervisor cannot watch 50 minutes; they can watch five moments.
+def _clock_short(s: float) -> str:
+    return f"{int(s // 60):02d}:{int(s % 60):02d}"
 
-    Scored by the magnitude of simultaneous change across available tracks,
-    which is agnostic about direction — a moment where the client suddenly goes
-    still is as worth watching as one where they become animated.
+
+def _describe_moment(rows: list[dict], idx: int) -> tuple[str, str, list[str]]:
+    """
+    Returns (observation, supervision_question, signal_tags) for one sampled
+    frame. Observations name measured quantities; questions stay non-inferential.
+    """
+    r = rows[idx]
+    ga_vals = [x["gesture_amplitude"] for x in rows]
+    po_vals = [x["posture_openness"] for x in rows if x.get("pose_present")]
+    hm_vals = [x["head_motion"] for x in rows]
+    ga_mu = float(np.mean(ga_vals)) if ga_vals else 0.0
+    po_mu = float(np.mean(po_vals)) if po_vals else 0.0
+    hm_mu = float(np.mean(hm_vals)) if hm_vals else 0.0
+
+    tags: list[str] = []
+    parts: list[str] = []
+
+    if r.get("arms_crossed"):
+        tags.append("arms_crossed")
+        parts.append("arms were folded at this point")
+    ga = r.get("gesture_amplitude", 0.0)
+    if ga_mu and ga > ga_mu * 1.6:
+        tags.append("high_gesture")
+        parts.append("hand and arm movement ran well above this clip's average")
+    elif ga_mu and ga < ga_mu * 0.45:
+        tags.append("low_gesture")
+        parts.append("movement dropped to unusually low levels")
+    po = r.get("posture_openness", 0.0)
+    if po_mu and po > po_mu * 1.35:
+        tags.append("open_posture")
+        parts.append("elbow span widened — posture more open than elsewhere in the clip")
+    elif po_mu and po < po_mu * 0.65:
+        tags.append("closed_posture")
+        parts.append("shoulder span narrowed relative to the rest of the recording")
+    hm = r.get("head_motion", 0.0)
+    if hm_mu and hm > hm_mu * 2.0:
+        tags.append("head_shift")
+        parts.append("head position shifted abruptly")
+    lean = r.get("lean", 0.0)
+    if abs(lean) > 0.14:
+        tags.append("leaned_away" if lean < 0 else "leaned_toward")
+        parts.append(
+            f"torso angled {'away from' if lean < 0 else 'toward'} the camera"
+        )
+
+    if not parts:
+        parts.append("multiple movement channels changed together")
+
+    observation = f"At {_clock_short(r['t'])}, " + "; ".join(parts) + "."
+
+    if "arms_crossed" in tags or "closed_posture" in tags:
+        question = (
+            "What topic was active here? In supervision, ask whether closure "
+            "coincided with difficulty the client was naming — not whether they "
+            "were 'being defensive'."
+        )
+    elif "low_gesture" in tags:
+        question = (
+            "Stillness at this timestamp — in the room, did this feel like deep "
+            "processing or disengagement? The recording cannot answer that; "
+            "the therapist can."
+        )
+    elif "high_gesture" in tags or "head_shift" in tags:
+        question = (
+            "Movement peaked here. Was the client working out a plan, reacting "
+            "to something the therapist said, or shifting to a new topic?"
+        )
+    elif "open_posture" in tags or "leaned_toward" in tags:
+        question = (
+            "Posture opened or leaned in. Did this coincide with the client "
+            "taking ownership of their part, or naming a next step?"
+        )
+    else:
+        question = (
+            "Several channels shifted at once — worth locating this moment in "
+            "the session recording and asking what was happening relationally."
+        )
+
+    return observation, question, tags
+
+
+def find_moments(analysis: dict, audio_summary: dict | None = None, k: int = 8) -> list[dict]:
+    """
+    Timestamps where several channels changed at once, with therapist-readable
+    observations and non-inferential supervision questions.
     """
     rows = analysis.get("signals", [])
     if len(rows) < 10:
@@ -355,27 +436,128 @@ def find_moments(analysis: dict, audio_summary: dict | None = None, k: int = 5) 
     for tr in tracks:
         change[1:] += np.abs(np.diff(tr))
 
-    # non-maximum suppression so the five moments are spread across the session
     order = np.argsort(change)[::-1]
     chosen: list[int] = []
+    min_gap = max(3, len(rows) // (k * 2 + 1))
     for i in order:
-        if all(abs(i - c) > len(rows) // (k * 2 + 1) for c in chosen):
+        if all(abs(i - c) > min_gap for c in chosen):
             chosen.append(int(i))
         if len(chosen) >= k:
             break
 
-    return [
-        {
+    out = []
+    for i in sorted(chosen, key=lambda j: rows[j]["t"]):
+        obs, question, tags = _describe_moment(rows, i)
+        out.append({
             "t": rows[i]["t"],
-            "timestamp": f"{int(rows[i]['t'] // 60):02d}:{int(rows[i]['t'] % 60):02d}",
+            "timestamp": _clock_short(rows[i]["t"]),
             "salience": round(float(change[i]), 3),
             "gesture_amplitude": rows[i]["gesture_amplitude"],
             "posture_openness": rows[i]["posture_openness"],
+            "head_motion": rows[i]["head_motion"],
             "arms_crossed": rows[i]["arms_crossed"],
-            "why": "Several movement channels changed together at this point.",
-        }
-        for i in sorted(chosen, key=lambda i: rows[i]["t"])
-    ]
+            "lean": rows[i].get("lean"),
+            "tags": tags,
+            "observation": obs,
+            "supervision_question": question,
+            "description": obs,
+            "why": obs,
+        })
+    return out
+
+
+def extract_preview_frames(
+    video_path: str | Path,
+    timestamps: list[float],
+    signals: list[dict] | None = None,
+    max_width: int = 420,
+) -> list[dict]:
+    """
+    Grab JPEG preview frames at the given timestamps. Returns base64-encoded
+    thumbnails with optional measurement overlay for supervision review.
+    """
+    try:
+        import cv2
+    except ImportError:
+        return []
+
+    path = Path(video_path)
+    if not path.exists() or not timestamps:
+        return []
+
+    cap = cv2.VideoCapture(str(path))
+    if not cap.isOpened():
+        return []
+
+    fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+    sig_by_t = {}
+    if signals:
+        for s in signals:
+            sig_by_t[round(s["t"], 1)] = s
+
+    previews: list[dict] = []
+    try:
+        for t in sorted(set(timestamps))[:12]:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, max(0, int(t * fps)))
+            ok, frame = cap.read()
+            if not ok:
+                continue
+
+            h, w = frame.shape[:2]
+            scale = min(1.0, max_width / w)
+            if scale < 1.0:
+                frame = cv2.resize(frame, (int(w * scale), int(h * scale)))
+
+            sig = min(sig_by_t.keys(), key=lambda x: abs(x - t), default=None)
+            nearest = sig_by_t.get(sig) if sig is not None and abs(sig - t) < 2.0 else None
+
+            ts_label = _clock_short(t)
+            cv2.rectangle(frame, (0, 0), (frame.shape[1], 28), (31, 32, 20), -1)
+            cv2.putText(frame, ts_label, (8, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.55,
+                        (231, 237, 234), 1, cv2.LINE_AA)
+
+            if nearest:
+                bar_y = frame.shape[0] - 36
+                cv2.rectangle(frame, (0, bar_y), (frame.shape[1], frame.shape[0]), (31, 32, 20), -1)
+                ga = nearest.get("gesture_amplitude", 0)
+                bar_w = int(min(frame.shape[1] - 20, ga * 200))
+                cv2.rectangle(frame, (10, bar_y + 10), (10 + bar_w, bar_y + 22), (92, 111, 31), -1)
+                label = "ARMS CROSSED" if nearest.get("arms_crossed") else f"gesture {ga:.2f}"
+                cv2.putText(frame, label, (10, bar_y + 32), cv2.FONT_HERSHEY_SIMPLEX, 0.4,
+                            (200, 205, 200), 1, cv2.LINE_AA)
+
+            ok_enc, buf = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 82])
+            if not ok_enc:
+                continue
+
+            previews.append({
+                "t": round(t, 2),
+                "timestamp": ts_label,
+                "preview_jpeg_b64": base64.b64encode(buf.tobytes()).decode("ascii"),
+                "width": frame.shape[1],
+                "height": frame.shape[0],
+                "arms_crossed": nearest.get("arms_crossed") if nearest else None,
+                "gesture_amplitude": nearest.get("gesture_amplitude") if nearest else None,
+            })
+    finally:
+        cap.release()
+
+    return previews
+
+
+def attach_frame_previews(
+    video_path: str | Path,
+    moments: list[dict],
+    findings: list[dict] | None = None,
+    signals: list[dict] | None = None,
+) -> dict[float, dict]:
+    """Extract previews for moments and body findings; return map by timestamp."""
+    times: list[float] = [m["t"] for m in moments if "t" in m]
+    for f in findings or []:
+        if f.get("start") is not None:
+            times.append(float(f["start"]))
+    previews = extract_preview_frames(video_path, times, signals)
+    return {p["t"]: p for p in previews}
 
 
 def review_session(

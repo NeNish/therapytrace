@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
+import { FrameCard, FrameImg, SupervisionList } from '../components/FramePreview'
 import { api, DIMENSION_LABELS } from '../lib/api'
 
 function ribbonColor(v) {
@@ -157,6 +158,82 @@ export default function SessionView() {
           </p>
         )}
       </div>
+
+      {s.parse_info?.multimodal?.insights && (
+        <div className="panel">
+          <h2>Audio & video insights</h2>
+          <p className="small muted" style={{ marginTop: -6 }}>
+            From recordings attached when this session was added.
+          </p>
+          {s.parse_info.multimodal.insights.audio?.available && (
+            <div style={{ marginBottom: 16 }}>
+              <div className="eyebrow">How it sounded</div>
+              <ul className="small" style={{ paddingLeft: 18, lineHeight: 1.7 }}>
+                {s.parse_info.multimodal.insights.audio.bullets?.map((b, i) => (
+                  <li key={i}>{b}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {s.parse_info.multimodal.insights.audio?.supervision_prompts && (
+            <SupervisionList prompts={s.parse_info.multimodal.insights.audio.supervision_prompts} />
+          )}
+          {s.parse_info.multimodal.insights.video?.available && (
+            <>
+              <div className="eyebrow">What the body did</div>
+              <p style={{ fontSize: 15, lineHeight: 1.65 }}>
+                {s.parse_info.multimodal.insights.video.summary}
+              </p>
+              <SupervisionList prompts={s.parse_info.multimodal.insights.video.supervision_prompts} />
+              {s.parse_info.multimodal.preview_gallery?.length > 0 && (
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                    gap: 12,
+                    marginTop: 16,
+                  }}
+                >
+                  {s.parse_info.multimodal.preview_gallery.map((p, i) => (
+                    <FrameCard key={i} preview={p} />
+                  ))}
+                </div>
+              )}
+              {s.parse_info.multimodal.insights.video.timeline?.length > 0 && (
+                <div style={{ marginTop: 16 }}>
+                  {s.parse_info.multimodal.insights.video.timeline.map((t, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: t.preview ? '100px 1fr' : '1fr',
+                        gap: 12,
+                        marginBottom: 14,
+                        paddingBottom: 14,
+                        borderBottom: '1px solid var(--rule)',
+                      }}
+                    >
+                      {t.preview && <FrameImg preview={t.preview} style={{ maxHeight: 80, objectFit: 'cover' }} />}
+                      <div>
+                        <span className="mono">{t.timestamp}</span>
+                        <span className="small muted"> · {t.kind?.replace(/_/g, ' ')}</span>
+                        <p className="small" style={{ margin: '4px 0' }}>{t.sentence}</p>
+                        {t.supervision_question && (
+                          <p className="small muted" style={{ fontStyle: 'italic' }}>{t.supervision_question}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+          {!s.parse_info.multimodal.insights.audio?.available &&
+           !s.parse_info.multimodal.insights.video?.available && (
+            <p className="small muted">No usable audio or video was attached to this session.</p>
+          )}
+        </div>
+      )}
 
       <details className="panel">
         <summary className="mono small" style={{ cursor: 'pointer' }}>Show raw transcript</summary>

@@ -41,7 +41,16 @@ export const api = {
     request('/sessions/multimodal', { method: 'POST', body: JSON.stringify(payload) }),
 
   addSession: (id, payload) =>
-    request(`/clients/${id}/sessions`, { method: 'POST', body: JSON.stringify(payload) }),
+    request(`/clients/${id}/sessions`, {
+      method: 'POST',
+      body: JSON.stringify({
+        transcript: payload.transcript,
+        session_number: payload.session_number,
+        audio_path: payload.audio_path || undefined,
+        video_path: payload.video_path || undefined,
+        max_seconds: payload.max_seconds || 120,
+      }),
+    }),
   uploadSession: (id, file) => {
     const fd = new FormData()
     fd.append('file', file)

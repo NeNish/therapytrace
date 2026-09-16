@@ -21,9 +21,30 @@ def _ordered_sessions(db: DbSession, client_id: int) -> list[TherapySession]:
     return [s for s in rows if s.analysis]
 
 
+def _analyse_session_media(
+    transcript: str,
+    audio_path: str | None = None,
+    video_path: str | None = None,
+    max_seconds: float = 120,
+) -> dict | None:
+    """Optional audio/video analysis stored alongside the text session."""
+    if not audio_path and not video_path:
+        return None
+    from .nlp.multimodal import run_multimodal_analysis
+
+    return run_multimodal_analysis({
+        "transcript": transcript,
+        "audio_path": audio_path,
+        "video_path": video_path,
+        "max_seconds": max_seconds,
+    })
+
+
 def add_session(
     db: DbSession, client: Client, payload_transcript: str,
     session_number: int | None, session_date=None, source: str = "upload",
+    audio_path: str | None = None, video_path: str | None = None,
+    max_seconds: float = 120,
 ) -> TherapySession:
     if session_number is None:
         session_number = (
@@ -63,9 +84,13 @@ def add_session(
     analysis.therapist_impact = result["therapist_impact"]
     analysis.therapist_moments = result["therapist_moments"]
     analysis.ml = result.get("ml", {})
+    media = _analyse_session_media(
+        payload_transcript, audio_path, video_path, max_seconds,
+    )
     analysis.parse_info = {
         **result["parse"],
         "confidence_notes": result["score"]["confidence_notes"],
+        "multimodal": media,
     }
     analysis.engine_version = ENGINE_VERSION
     # Assign through the relationship, not just the FK. `sess.analysis` was read

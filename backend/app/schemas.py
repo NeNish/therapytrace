@@ -38,6 +38,9 @@ class SessionCreate(BaseModel):
     session_date: dt.date | None = None
     source: str = "upload"
     transcript: str = Field(min_length=20)
+    audio_path: str | None = None
+    video_path: str | None = None
+    max_seconds: float | None = 120
 
 
 class SessionSummary(BaseModel):
