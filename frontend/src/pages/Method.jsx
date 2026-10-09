@@ -1,3 +1,58 @@
+import { useEffect, useState } from 'react'
+
+import { api } from '../lib/api'
+
+/**
+ * Loads what the API actually has in memory rather than restating numbers
+ * typed into this page. If a model fails to load, this says so instead of
+ * quietly describing a model that is not there.
+ */
+function LoadedModels() {
+  const [info, setInfo] = useState(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => { api.models().then(setInfo).catch(() => setFailed(true)) }, [])
+
+  if (failed || !info) return null
+
+  return (
+    <div className="panel">
+      <h2>Supervised models in this build</h2>
+      <p className="small muted" style={{ marginTop: -6 }}>
+        {info.dataset}. Split protocol: {info.split_protocol} &mdash; held-out
+        figures come from whole conversations the model never saw, never from
+        held-out utterances of a conversation it trained on.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Model</th><th>Task</th><th>Loaded</th>
+            <th>Accuracy</th><th>Macro-F1</th>
+          </tr>
+        </thead>
+        <tbody>
+          {(info.models || []).map((m) => (
+            <tr key={m.id}>
+              <td>{m.algorithm}</td>
+              <td>{m.task}</td>
+              <td>{m.loaded ? 'yes' : 'no — artifact missing'}</td>
+              <td>{m.held_out_accuracy}</td>
+              <td>{m.held_out_macro_f1}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="small muted">
+        These numbers are why the change-talk share is bias-corrected before it is
+        displayed. The classifier under-detects sustain talk, which inflates the raw
+        share by roughly 0.25 for a client who is genuinely evenly split &mdash; and
+        that error does not shrink on longer sessions, because it is systematic
+        rather than random.
+      </p>
+    </div>
+  )
+}
+
 export default function Method() {
   return (
     <>
@@ -114,6 +169,8 @@ TPI(s) = 50 + 10 * sum_d ( w_d * z_d(s) )`}
         deployment on real clinical material needs ethics approval, informed
         consent covering secondary analysis, and encryption at rest.
       </p>
+
+      <LoadedModels />
     </>
   )
 }

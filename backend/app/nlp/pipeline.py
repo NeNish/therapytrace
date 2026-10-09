@@ -113,6 +113,34 @@ def rollup_client(session_rows: list[dict], turn_records: list[dict] | None = No
     dim_series = {
         d: [round(r["features"].get(d, 0.0), 4) for r in rescored] for d in DIMENSIONS
     }
+
+    # Change-talk ratio per session, from the AnnoMI-trained classifier.
+    #
+    # This is the point at which the supervised layer becomes longitudinal. The
+    # ratio is a session-level quantity, so a series of it can be read the same
+    # way the TPI is, and the two are independent: the TPI comes from the
+    # lexicon, this comes from a model trained on expert annotations. Where they
+    # agree, that agreement is external validation rather than restatement.
+    #
+    # Sessions scored before the models were present, or whose transcript had no
+    # directional turns, contribute None rather than a fabricated zero, so the
+    # front end can break the line instead of drawing through a gap.
+    change_talk_series = []
+    for r in rescored:
+        ml = r.get("ml") or {}
+        talk = ml.get("client_talk") or {}
+        change_talk_series.append(
+            {
+                "session_number": r.get("session_number"),
+                "ratio": talk.get("change_talk_ratio"),
+                "ratio_raw": talk.get("change_talk_ratio_raw"),
+                "directional_turns": talk.get("directional_turns"),
+                "lo": talk.get("change_talk_lo"),
+                "hi": talk.get("change_talk_hi"),
+                "wide": talk.get("estimate_is_wide", False),
+            }
+        )
+    has_change_talk = any(p["ratio"] is not None for p in change_talk_series)
     traj = summarise(tpi_series)
     profile = profile_client(dim_series, turn_records or [])
     features_series = [r["features"] for r in rescored]
@@ -127,6 +155,7 @@ def rollup_client(session_rows: list[dict], turn_records: list[dict] | None = No
         "sessions": rescored,
         "tpi_series": tpi_series,
         "dimension_series": dim_series,
+        "change_talk_series": change_talk_series if has_change_talk else [],
         "trajectory": traj,
         "profile": profile,
         "recommendation": recommend(
@@ -137,7 +166,10 @@ def rollup_client(session_rows: list[dict], turn_records: list[dict] | None = No
                        "confidence": rescored[-1].get("confidence", 1.0),
                        "contributions": rescored[-1].get("contributions", {})},
              "features": features_series[-1],
-             "ml": {}},
+             # The classifier output for the most recent session, not an empty
+             # dict. The note generator reads it to mention change talk when
+             # the model has something to say about the session being described.
+             "ml": rescored[-1].get("ml") or {}},
             trajectory=traj,
             baseline={"mean_words": mean_words},
         ),

@@ -105,6 +105,10 @@ def get_trajectory(client_id: int, db: DbSession = Depends(get_db)):
         ],
         "tpi_series": roll.get("tpi_series", []),
         "dimension_series": roll.get("dimension_series", {}),
+        # Extends the call the trace page already makes rather than adding a
+        # second round trip for a series that is always wanted alongside the TPI.
+        # Empty when no session has been scored by the classifier.
+        "change_talk_series": roll.get("change_talk_series", []),
         "trajectory": roll.get("trajectory"),
         "measures": roll.get("measures", []),
         "validation": roll.get("validation"),

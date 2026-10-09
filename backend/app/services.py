@@ -144,6 +144,10 @@ def client_trajectory(db: DbSession, client: Client) -> dict:
             "session_number": s.session_number,
             "session_date": s.session_date,
             "features": s.analysis.features,
+            # Carried through so the roll-up can build the change-talk series.
+            # Without it the supervised layer stops at the database, which is
+            # exactly where it used to stop.
+            "ml": s.analysis.ml or {},
         }
         for s in ordered
     ]

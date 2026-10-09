@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
+import ChangeTalk from '../components/ChangeTalk'
 import DimensionGrid from '../components/DimensionGrid'
 import Trace from '../components/Trace'
 import { api, DIMENSION_LABELS, STATE_COPY, stateColor } from '../lib/api'
@@ -140,6 +141,14 @@ export default function CaseTrace() {
           series={tpi_series}
           changePoint={cp}
           measures={measures}
+          selected={selected}
+          onSelect={(i) => setSelected(i)}
+        />
+
+        {/* Second panel, same x-axis, its own scale. Renders nothing until at
+            least two sessions carry a classifier estimate. */}
+        <ChangeTalk
+          points={data.change_talk_series || []}
           selected={selected}
           onSelect={(i) => setSelected(i)}
         />

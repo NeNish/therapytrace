@@ -61,6 +61,62 @@ export default function SessionView() {
         </div>
       )}
 
+      {/* ---------------- change talk, from the AnnoMI classifier ----------
+          Deliberately shows the counts and the turn count, not just the ratio.
+          A ratio from four turns and one from forty are not the same claim, and
+          the interface should not let them look alike. Per-turn labels are not
+          shown at all: at macro-F1 0.49 roughly one in two is wrong, and a
+          coloured transcript would present that noise as fact. ------------- */}
+      {(() => {
+        const talk = data.ml && data.ml.client_talk
+        if (!talk || talk.change_talk_ratio === null || talk.change_talk_ratio === undefined) {
+          return null
+        }
+        return (
+          <div className="panel">
+            <h2>Change talk this session</h2>
+            <p className="small muted" style={{ marginTop: -6 }}>
+              From a classifier trained on AnnoMI expert annotations &mdash; independent
+              of the progress index, which comes from the lexicon.
+            </p>
+            <div className="readout" style={{ marginTop: 12 }}>
+              <div className="readout-item">
+                <div className="k">Change-talk share</div>
+                <div className="v">{talk.change_talk_ratio.toFixed(2)}</div>
+              </div>
+              <div className="readout-item">
+                <div className="k">Directional turns</div>
+                <div className="v">{talk.directional_turns}</div>
+              </div>
+              <div className="readout-item">
+                <div className="k">Change / sustain</div>
+                <div className="v">{talk.n_change} / {talk.n_sustain}</div>
+              </div>
+              <div className="readout-item">
+                <div className="k">Uncorrected</div>
+                <div className="v">
+                  {talk.change_talk_ratio_raw !== null && talk.change_talk_ratio_raw !== undefined
+                    ? talk.change_talk_ratio_raw.toFixed(2)
+                    : '—'}
+                </div>
+              </div>
+            </div>
+            <p className="small muted" style={{ marginTop: 10 }}>
+              {talk.directional_turns < 10 && (
+                <>Only {talk.directional_turns} directional turns, so this estimate is weak. </>
+              )}
+              {talk.change_talk_lo !== null && talk.change_talk_lo !== undefined ? (
+                <>80% credible interval {talk.change_talk_lo.toFixed(2)} to{' '}
+                {talk.change_talk_hi.toFixed(2)}
+                {talk.estimate_is_wide ? ' — too wide to read as a single number. ' : '. '}</>
+              ) : null}
+              The uncorrected figure is shown because the classifier under-detects
+              sustain talk, which inflates the raw share. Corrected is the one to read.
+            </p>
+          </div>
+        )
+      })()}
+
       {/* ---------------- utterance ribbon ---------------- */}
       <div className="panel">
         <h2>Turn by turn</h2>

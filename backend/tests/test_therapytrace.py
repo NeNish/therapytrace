@@ -799,3 +799,109 @@ def test_upload_rejects_unsupported_types(client):
     r = client.post("/api/upload/media",
                     files={"file": ("notes.txt", io.BytesIO(b"hello"), "text/plain")})
     assert r.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# M23 — the change-talk ratio reaches the interface, and is corrected first
+# ---------------------------------------------------------------------------
+
+def test_bias_correction_inverts_the_known_classifier_error():
+    """
+    The correction must undo the classifier's own error, not merely shift the
+    number. The test works forwards then backwards: take a true split, push it
+    through the held-out confusion matrix to get the counts the classifier
+    would produce, and check the correction recovers what we started from.
+
+    Without this, a client who is evenly split reads as roughly 0.75 — the bug
+    that made the raw ratio unsafe to display in the first place.
+    """
+    from app.nlp.ml_models import _directional_matrix, corrected_change_ratio
+
+    cc, cs, sc, ss = _directional_matrix()
+
+    def as_reported(true_ratio: float, n: int = 4000) -> tuple[float, float]:
+        n_change, n_sustain = true_ratio * n, (1 - true_ratio) * n
+        pred_change = n_change * cc + n_sustain * sc
+        pred_sustain = n_change * cs + n_sustain * ss
+        raw = pred_change / (pred_change + pred_sustain)
+        fixed = corrected_change_ratio(round(pred_change), round(pred_sustain))["ratio"]
+        return raw, fixed
+
+    for true_ratio in (0.1, 0.25, 0.5, 0.75, 0.9):
+        _, recovered = as_reported(true_ratio)
+        assert abs(recovered - true_ratio) < 0.02, (true_ratio, recovered)
+
+    # The raw estimator does not simply read high everywhere — it compresses
+    # toward a fixed point near 0.70, reading high below it and low above it.
+    # That compression is the real defect: it is what makes a client who is
+    # barely changing look like one who is changing a great deal.
+    raw_low, _ = as_reported(0.20)
+    raw_high, _ = as_reported(0.90)
+    assert raw_low > 0.20 + 0.15, "raw should read far too high at the low end"
+    assert raw_high < 0.90, "raw should read low at the high end"
+
+    # A true span of 0.70 must survive as far less than half of itself raw,
+    # and come back close to full size once corrected.
+    assert (raw_high - raw_low) < 0.35, "raw range should be heavily compressed"
+    _, fixed_low = as_reported(0.20)
+    _, fixed_high = as_reported(0.90)
+    assert (fixed_high - fixed_low) > 0.65, "correction should restore the range"
+
+
+def test_estimate_never_pins_to_the_extremes_on_a_short_session():
+    """
+    The reason this is a posterior and not a matrix inversion.
+
+    Real sessions carry roughly seven to fifteen directional turns. The
+    algebraic inversion clamps to exactly 0.00 or 1.00 at that size — on the
+    demo data it did so for eight of twelve sessions, producing a step function
+    between two extremes stated with total confidence. The estimate must stay
+    strictly inside the range and widen its interval instead.
+    """
+    from app.nlp.ml_models import corrected_change_ratio
+
+    assert corrected_change_ratio(0, 0)["ratio"] is None
+
+    for n_change, n_sustain in [(0, 10), (10, 0), (1, 14), (15, 1), (0, 7), (7, 0)]:
+        r = corrected_change_ratio(n_change, n_sustain)
+        assert 0.0 < r["ratio"] < 1.0, (n_change, n_sustain, r)
+        assert r["lo"] <= r["ratio"] <= r["hi"]
+
+    # Thin evidence must widen the interval rather than sharpen the point.
+    short = corrected_change_ratio(3, 3)
+    long = corrected_change_ratio(30, 30)
+    assert (short["hi"] - short["lo"]) > (long["hi"] - long["lo"])
+    assert short["wide"] is True
+
+
+def test_change_talk_series_reaches_the_trajectory_endpoint(client):
+    """
+    The regression this whole module exists to prevent: the models ran, the
+    output was stored, and nothing downstream ever read it.
+    """
+    from app.nlp.ml_models import available
+
+    client.post("/api/demo/seed")
+    cid = client.get("/api/clients").json()[0]["id"]
+    body = client.get(f"/api/clients/{cid}/trajectory").json()
+
+    assert "change_talk_series" in body
+    if not available()["change_talk"]:
+        return  # no artifacts in this environment; the key must still exist
+
+    series = body["change_talk_series"]
+    assert series, "classifier is loaded but the series is empty"
+    assert len(series) == len(body["tpi_series"])
+    for point in series:
+        assert set(point) >= {"session_number", "ratio", "directional_turns"}
+        if point["ratio"] is not None:
+            assert 0.0 <= point["ratio"] <= 1.0
+
+
+def test_rollup_no_longer_hands_the_narrative_an_empty_ml_block():
+    """`session_note` used to receive a literal {} regardless of what ran."""
+    import inspect
+    from app.nlp import pipeline
+
+    src = inspect.getsource(pipeline.rollup_client)
+    assert '"ml": {}' not in src
