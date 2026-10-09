@@ -7,7 +7,8 @@
     "selection": "CV macro-F1 on development conversations; the test set is scored once",
     "class_balancing": "equalised across learners: class_weight='balanced' (linear models, LightGBM), balanced_subsample (random forest), uniform priors (naive Bayes), injected balanced sample weights (XGBoost). The MLP cannot be balanced in scikit-learn and is the one unbalanced learner.",
     "random_state": 42,
-    "timing": "fit_seconds_clean is the classifier's own fit time on fold 0 of the development split, measured on an idle machine with 2 vCPUs; feature_build_seconds is the shared TF-IDF and lexicon build, timed separately. The timings recorded during the benchmark run itself (mean_fit_seconds) are left in place but are not used for any claim, because they were collected under variable CPU load."
+    "timing": "fit_seconds_clean is the classifier's own fit time on fold 0 of the development split, measured on an idle machine with 2 vCPUs; feature_build_seconds is the shared TF-IDF and lexicon build, timed separately. The timings recorded during the benchmark run itself (mean_fit_seconds) are left in place but are not used for any claim, because they were collected under variable CPU load.",
+    "confusion_all": "A held-out confusion matrix and per-class recall are stored for every model, from a single fit on the development conversations, so the deployment choice can be made on the per-class behaviour the interface depends on rather than on macro-F1 alone."
   },
   "display_names": {
     "majority_class": "Majority class",
@@ -140,7 +141,29 @@
             "sustain": 0.0
           },
           "fit_seconds_clean": 0.0,
-          "fit_seconds_total_clean": 7.61
+          "fit_seconds_total_clean": 7.61,
+          "confusion_matrix": [
+            [
+              0,
+              449,
+              0
+            ],
+            [
+              0,
+              917,
+              0
+            ],
+            [
+              0,
+              290,
+              0
+            ]
+          ],
+          "per_class_recall": {
+            "change": 0.0,
+            "neutral": 1.0,
+            "sustain": 0.0
+          }
         },
         "naive_bayes": {
           "cv": {
@@ -281,7 +304,12 @@
             ]
           ],
           "fit_seconds_clean": 0.01,
-          "fit_seconds_total_clean": 7.62
+          "fit_seconds_total_clean": 7.62,
+          "per_class_recall": {
+            "change": 0.6169,
+            "neutral": 0.5802,
+            "sustain": 0.2103
+          }
         },
         "logistic_regression": {
           "cv": {
@@ -372,7 +400,29 @@
             "sustain": 0.3514
           },
           "fit_seconds_clean": 2.47,
-          "fit_seconds_total_clean": 10.08
+          "fit_seconds_total_clean": 10.08,
+          "confusion_matrix": [
+            [
+              240,
+              147,
+              62
+            ],
+            [
+              253,
+              561,
+              103
+            ],
+            [
+              89,
+              104,
+              97
+            ]
+          ],
+          "per_class_recall": {
+            "change": 0.5345,
+            "neutral": 0.6118,
+            "sustain": 0.3345
+          }
         },
         "linear_svm": {
           "cv": {
@@ -463,7 +513,29 @@
             "sustain": 0.32
           },
           "fit_seconds_clean": 0.34,
-          "fit_seconds_total_clean": 7.95
+          "fit_seconds_total_clean": 7.95,
+          "confusion_matrix": [
+            [
+              224,
+              167,
+              58
+            ],
+            [
+              194,
+              630,
+              93
+            ],
+            [
+              83,
+              123,
+              84
+            ]
+          ],
+          "per_class_recall": {
+            "change": 0.4989,
+            "neutral": 0.687,
+            "sustain": 0.2897
+          }
         },
         "random_forest": {
           "cv": {
@@ -554,7 +626,29 @@
             "sustain": 0.248
           },
           "fit_seconds_clean": 11.49,
-          "fit_seconds_total_clean": 19.1
+          "fit_seconds_total_clean": 19.1,
+          "confusion_matrix": [
+            [
+              261,
+              182,
+              6
+            ],
+            [
+              179,
+              709,
+              29
+            ],
+            [
+              111,
+              133,
+              46
+            ]
+          ],
+          "per_class_recall": {
+            "change": 0.5813,
+            "neutral": 0.7732,
+            "sustain": 0.1586
+          }
         },
         "xgboost": {
           "cv": {
@@ -645,7 +739,29 @@
             "sustain": 0.292
           },
           "fit_seconds_clean": 56.0,
-          "fit_seconds_total_clean": 63.61
+          "fit_seconds_total_clean": 63.61,
+          "confusion_matrix": [
+            [
+              256,
+              138,
+              55
+            ],
+            [
+              220,
+              574,
+              123
+            ],
+            [
+              82,
+              128,
+              80
+            ]
+          ],
+          "per_class_recall": {
+            "change": 0.5702,
+            "neutral": 0.626,
+            "sustain": 0.2759
+          }
         },
         "lightgbm": {
           "cv": {
@@ -736,7 +852,29 @@
             "sustain": 0.1532
           },
           "fit_seconds_clean": 35.84,
-          "fit_seconds_total_clean": 43.45
+          "fit_seconds_total_clean": 43.45,
+          "confusion_matrix": [
+            [
+              212,
+              185,
+              52
+            ],
+            [
+              199,
+              650,
+              68
+            ],
+            [
+              101,
+              155,
+              34
+            ]
+          ],
+          "per_class_recall": {
+            "change": 0.4722,
+            "neutral": 0.7088,
+            "sustain": 0.1172
+          }
         },
         "mlp": {
           "cv": {
@@ -827,7 +965,29 @@
             "sustain": 0.1308
           },
           "fit_seconds_clean": 7.47,
-          "fit_seconds_total_clean": 15.08
+          "fit_seconds_total_clean": 15.08,
+          "confusion_matrix": [
+            [
+              232,
+              216,
+              1
+            ],
+            [
+              137,
+              771,
+              9
+            ],
+            [
+              67,
+              202,
+              21
+            ]
+          ],
+          "per_class_recall": {
+            "change": 0.5167,
+            "neutral": 0.8408,
+            "sustain": 0.0724
+          }
         }
       },
       "feature_build_seconds": 7.61
@@ -945,7 +1105,39 @@
             "therapist_input": 0.0
           },
           "fit_seconds_clean": 0.0,
-          "fit_seconds_total_clean": 8.09
+          "fit_seconds_total_clean": 8.09,
+          "confusion_matrix": [
+            [
+              0,
+              220,
+              0,
+              0
+            ],
+            [
+              0,
+              546,
+              0,
+              0
+            ],
+            [
+              0,
+              579,
+              0,
+              0
+            ],
+            [
+              0,
+              449,
+              0,
+              0
+            ]
+          ],
+          "per_class_recall": {
+            "other": 0.0,
+            "question": 1.0,
+            "reflection": 0.0,
+            "therapist_input": 0.0
+          }
         },
         "naive_bayes": {
           "cv": {
@@ -1037,7 +1229,39 @@
             "therapist_input": 0.5823
           },
           "fit_seconds_clean": 0.01,
-          "fit_seconds_total_clean": 8.1
+          "fit_seconds_total_clean": 8.1,
+          "confusion_matrix": [
+            [
+              55,
+              15,
+              97,
+              53
+            ],
+            [
+              5,
+              401,
+              101,
+              39
+            ],
+            [
+              7,
+              39,
+              458,
+              75
+            ],
+            [
+              5,
+              29,
+              162,
+              253
+            ]
+          ],
+          "per_class_recall": {
+            "other": 0.25,
+            "question": 0.7344,
+            "reflection": 0.791,
+            "therapist_input": 0.5635
+          }
         },
         "logistic_regression": {
           "cv": {
@@ -1194,7 +1418,13 @@
             ]
           ],
           "fit_seconds_clean": 4.03,
-          "fit_seconds_total_clean": 12.12
+          "fit_seconds_total_clean": 12.12,
+          "per_class_recall": {
+            "other": 0.3136,
+            "question": 0.7894,
+            "reflection": 0.791,
+            "therapist_input": 0.5189
+          }
         },
         "linear_svm": {
           "cv": {
@@ -1286,7 +1516,39 @@
             "therapist_input": 0.5668
           },
           "fit_seconds_clean": 0.4,
-          "fit_seconds_total_clean": 8.49
+          "fit_seconds_total_clean": 8.49,
+          "confusion_matrix": [
+            [
+              61,
+              16,
+              95,
+              48
+            ],
+            [
+              4,
+              446,
+              60,
+              36
+            ],
+            [
+              25,
+              34,
+              484,
+              36
+            ],
+            [
+              41,
+              55,
+              128,
+              225
+            ]
+          ],
+          "per_class_recall": {
+            "other": 0.2773,
+            "question": 0.8168,
+            "reflection": 0.8359,
+            "therapist_input": 0.5011
+          }
         },
         "random_forest": {
           "cv": {
@@ -1378,7 +1640,39 @@
             "therapist_input": 0.5332
           },
           "fit_seconds_clean": 11.8,
-          "fit_seconds_total_clean": 19.89
+          "fit_seconds_total_clean": 19.89,
+          "confusion_matrix": [
+            [
+              75,
+              12,
+              99,
+              34
+            ],
+            [
+              6,
+              413,
+              98,
+              29
+            ],
+            [
+              27,
+              39,
+              461,
+              52
+            ],
+            [
+              24,
+              29,
+              191,
+              205
+            ]
+          ],
+          "per_class_recall": {
+            "other": 0.3409,
+            "question": 0.7564,
+            "reflection": 0.7962,
+            "therapist_input": 0.4566
+          }
         },
         "xgboost": {
           "cv": {
@@ -1470,7 +1764,39 @@
             "therapist_input": 0.5891
           },
           "fit_seconds_clean": 84.42,
-          "fit_seconds_total_clean": 92.51
+          "fit_seconds_total_clean": 92.51,
+          "confusion_matrix": [
+            [
+              105,
+              9,
+              73,
+              33
+            ],
+            [
+              6,
+              430,
+              62,
+              48
+            ],
+            [
+              42,
+              36,
+              461,
+              40
+            ],
+            [
+              57,
+              35,
+              119,
+              238
+            ]
+          ],
+          "per_class_recall": {
+            "other": 0.4773,
+            "question": 0.7875,
+            "reflection": 0.7962,
+            "therapist_input": 0.5301
+          }
         },
         "lightgbm": {
           "cv": {
@@ -1562,7 +1888,39 @@
             "therapist_input": 0.5913
           },
           "fit_seconds_clean": 44.81,
-          "fit_seconds_total_clean": 52.9
+          "fit_seconds_total_clean": 52.9,
+          "confusion_matrix": [
+            [
+              72,
+              15,
+              103,
+              30
+            ],
+            [
+              2,
+              454,
+              60,
+              30
+            ],
+            [
+              21,
+              50,
+              481,
+              27
+            ],
+            [
+              40,
+              55,
+              129,
+              225
+            ]
+          ],
+          "per_class_recall": {
+            "other": 0.3273,
+            "question": 0.8315,
+            "reflection": 0.8307,
+            "therapist_input": 0.5011
+          }
         },
         "mlp": {
           "cv": {
@@ -1654,7 +2012,39 @@
             "therapist_input": 0.5893
           },
           "fit_seconds_clean": 14.15,
-          "fit_seconds_total_clean": 22.24
+          "fit_seconds_total_clean": 22.24,
+          "confusion_matrix": [
+            [
+              54,
+              17,
+              114,
+              35
+            ],
+            [
+              2,
+              454,
+              59,
+              31
+            ],
+            [
+              6,
+              39,
+              484,
+              50
+            ],
+            [
+              4,
+              54,
+              155,
+              236
+            ]
+          ],
+          "per_class_recall": {
+            "other": 0.2455,
+            "question": 0.8315,
+            "reflection": 0.8359,
+            "therapist_input": 0.5256
+          }
         }
       },
       "feature_build_seconds": 8.09
