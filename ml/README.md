@@ -1,7 +1,12 @@
-# ML component (M10)
+# ML component (M10, M21)
 
-Two supervised classifiers trained on **AnnoMI** (Wu et al., 2023) — 133
+Supervised classifiers trained on **AnnoMI** (Wu et al., 2023) — 133
 expert-annotated motivational-interviewing dialogues.
+
+> **What AnnoMI is.** Performed demonstration videos used for MI training, not
+> recordings of clinical sessions, and the 23 low-quality transcripts are
+> deliberately staged poor counselling. Every number here is a claim about this
+> corpus and nothing more.
 
 ## Reproducing
 
@@ -9,20 +14,82 @@ expert-annotated motivational-interviewing dialogues.
 curl -L -o ml/data/AnnoMI-full.csv \
   https://raw.githubusercontent.com/uccollab/AnnoMI/main/AnnoMI-full.csv
 
-pip install scikit-learn pandas scipy joblib matplotlib
+pip install scikit-learn pandas scipy joblib matplotlib xgboost lightgbm
+
+# M10 — does the lexicon add signal? (features vary, classifier fixed)
 python ml/train.py                     # trains, cross-validates, ablates
 python ml/finalize.py                  # fits final models, saves figures
 python ml/validate_against_annomi.py   # validates the TPI against experts
+
+# M21 — does the classifier choice matter? (features fixed, learner varies)
+python ml/benchmark.py                 # 7 learners × 2 tasks, grouped CV   (~40 min)
+python ml/time_models.py               # clean fit-time measurement, idle CPU
+python ml/figure_benchmark.py          # six figures into ml/artifacts/
+python ml/report_benchmark.py > ml/RESULTS.md
 ```
 
 The dataset is **not** committed — download it from the link above.
 
 ## Results (held-out conversations)
 
-| Task | Classes | Accuracy | Macro-F1 |
+Selected model per task, from the M21 benchmark:
+
+| Task | Classes | Model | Accuracy | Macro-F1 | ROC-AUC |
+|---|---|---|---|---|---|
+| Client talk type | change / sustain / neutral | Naive Bayes | 0.525 | 0.457 | 0.674 |
+| Therapist behaviour | question / reflection / therapist_input / other | Logistic Regression | 0.664 | 0.608 | 0.850 |
+
+Full tables for all seven learners — accuracy, macro-F1, weighted-F1, macro
+precision and recall, ROC-AUC, per-class F1, confusion matrices and paired
+significance tests — are in **[`RESULTS.md`](RESULTS.md)**, generated directly
+from `artifacts/benchmark.json` so the prose cannot drift from the data.
+
+## M21 — seven classifiers, one identical feature matrix
+
+Every learner sees the same TF-IDF word 1–2 grams + character 3–5 grams + 12
+lexicon features, and every learner is class-balanced by whatever mechanism it
+offers, so a difference in score is attributable to the learner and not to
+feature engineering or to one model quietly optimising raw accuracy.
+
+| Model | Client macro-F1 (CV) | Therapist macro-F1 (CV) | Fit (s) |
 |---|---|---|---|
-| Client talk type | change / sustain / neutral | 0.54 | 0.49 |
-| Therapist behaviour | question / reflection / therapist_input / other | 0.65 | 0.61 |
+| Majority class | 0.228 | 0.145 | 0.00 |
+| Naive Bayes | **0.465** | 0.585 | 0.01 |
+| Logistic Regression | 0.464 | **0.639** | 2.47 |
+| Linear SVM | 0.459 | 0.627 | 0.34 |
+| Random Forest | 0.420 | 0.584 | 11.49 |
+| XGBoost | 0.463 | 0.625 | 56.00 |
+| LightGBM | 0.424 | 0.629 | 35.84 |
+| MLP (128 hidden) | 0.414 | 0.613 | 7.47 |
+
+**The finding is a negative one, and it is the useful part.** On client talk
+type a paired t-test across the five folds cannot separate the best learner from
+any of the other six. The spread across all seven is 0.051 macro-F1 against a
+fold-to-fold standard deviation of 0.043 — the gaps are inside the noise.
+XGBoost needs 56 s to fit where Naive Bayes needs 0.01 s and scores no better.
+
+That is evidence, not an excuse: with ~3,000 short utterances and tens of
+thousands of sparse features, a regularised linear boundary is already the right
+capacity, and the ceiling is set by the task rather than by the model. Chasing a
+better utterance classifier would be a poor use of this project's effort. The
+contribution sits in the layer above — within-person normalisation, trajectory
+across sessions, and state-conditional therapist effects — which none of these
+seven models addresses.
+
+Model selection is also shown to be imperfect rather than hidden: the model with
+the best CV score is not always the one with the best held-out score, so
+`RESULTS.md` reports the held-out number for *every* model, not only the winner.
+
+### Figures
+
+| File | Shows |
+|---|---|
+| `artifacts/bench_models.png` | CV macro-F1 per learner, ± 1 SD, against the majority-class floor |
+| `artifacts/bench_metrics.png` | Six held-out metrics × eight models, both tasks |
+| `artifacts/bench_perclass.png` | Per-class F1 — the minority classes are the hard part |
+| `artifacts/bench_confusion.png` | Confusion matrices for the selected model |
+| `artifacts/bench_cost.png` | Macro-F1 against fit time, log scale |
+| `artifacts/bench_folds.png` | Fold-level spread with paired t-test Δ and p |
 
 ## The methodological point
 
