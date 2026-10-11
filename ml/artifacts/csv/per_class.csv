@@ -1,0 +1,57 @@
+task,model,class,f1,recall,support
+Client talk type,Majority class,change,0.0,0.0,449
+Client talk type,Majority class,neutral,0.7128,1.0,917
+Client talk type,Majority class,sustain,0.0,0.0,290
+Client talk type,Naive Bayes,change,0.5083,0.6169,449
+Client talk type,Naive Bayes,neutral,0.6197,0.5802,917
+Client talk type,Naive Bayes,sustain,0.2416,0.2103,290
+Client talk type,Logistic Regression,change,0.4656,0.5345,449
+Client talk type,Logistic Regression,neutral,0.6489,0.6118,917
+Client talk type,Logistic Regression,sustain,0.3514,0.3345,290
+Client talk type,Linear SVM,change,0.4716,0.4989,449
+Client talk type,Linear SVM,neutral,0.6859,0.687,917
+Client talk type,Linear SVM,sustain,0.32,0.2897,290
+Client talk type,Random Forest,change,0.522,0.5813,449
+Client talk type,Random Forest,neutral,0.7306,0.7732,917
+Client talk type,Random Forest,sustain,0.248,0.1586,290
+Client talk type,XGBoost,change,0.5084,0.5702,449
+Client talk type,XGBoost,neutral,0.6534,0.626,917
+Client talk type,XGBoost,sustain,0.292,0.2759,290
+Client talk type,LightGBM,change,0.4412,0.4722,449
+Client talk type,LightGBM,neutral,0.6817,0.7088,917
+Client talk type,LightGBM,sustain,0.1532,0.1172,290
+Client talk type,MLP (128 hidden),change,0.5243,0.5167,449
+Client talk type,MLP (128 hidden),neutral,0.7322,0.8408,917
+Client talk type,MLP (128 hidden),sustain,0.1308,0.0724,290
+Therapist behaviour,Majority class,other,0.0,0.0,220
+Therapist behaviour,Majority class,question,0.4667,1.0,546
+Therapist behaviour,Majority class,reflection,0.0,0.0,579
+Therapist behaviour,Majority class,therapist_input,0.0,0.0,449
+Therapist behaviour,Naive Bayes,other,0.3767,0.25,220
+Therapist behaviour,Naive Bayes,question,0.7786,0.7344,546
+Therapist behaviour,Naive Bayes,reflection,0.6557,0.791,579
+Therapist behaviour,Naive Bayes,therapist_input,0.5823,0.5635,449
+Therapist behaviour,Logistic Regression,other,0.3622,0.3136,220
+Therapist behaviour,Logistic Regression,question,0.8019,0.7894,546
+Therapist behaviour,Logistic Regression,reflection,0.6971,0.791,579
+Therapist behaviour,Logistic Regression,therapist_input,0.5697,0.5189,449
+Therapist behaviour,Linear SVM,other,0.3476,0.2773,220
+Therapist behaviour,Linear SVM,question,0.8131,0.8168,546
+Therapist behaviour,Linear SVM,reflection,0.7192,0.8359,579
+Therapist behaviour,Linear SVM,therapist_input,0.5668,0.5011,449
+Therapist behaviour,Random Forest,other,0.4261,0.3409,220
+Therapist behaviour,Random Forest,question,0.795,0.7564,546
+Therapist behaviour,Random Forest,reflection,0.6457,0.7962,579
+Therapist behaviour,Random Forest,therapist_input,0.5332,0.4566,449
+Therapist behaviour,XGBoost,other,0.4884,0.4773,220
+Therapist behaviour,XGBoost,question,0.8144,0.7875,546
+Therapist behaviour,XGBoost,reflection,0.7125,0.7962,579
+Therapist behaviour,XGBoost,therapist_input,0.5891,0.5301,449
+Therapist behaviour,LightGBM,other,0.4056,0.3273,220
+Therapist behaviour,LightGBM,question,0.8107,0.8315,546
+Therapist behaviour,LightGBM,reflection,0.7115,0.8307,579
+Therapist behaviour,LightGBM,therapist_input,0.5913,0.5011,449
+Therapist behaviour,MLP (128 hidden),other,0.3776,0.2455,220
+Therapist behaviour,MLP (128 hidden),question,0.818,0.8315,546
+Therapist behaviour,MLP (128 hidden),reflection,0.6959,0.8359,579
+Therapist behaviour,MLP (128 hidden),therapist_input,0.5893,0.5256,449
