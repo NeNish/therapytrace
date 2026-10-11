@@ -1,0 +1,192 @@
+{
+  "task": "client directional talk: change vs sustain",
+  "rationale": "The interface computes change / (change + sustain) over directional turns only, so the neutral class is never used. This measures the classifier the product actually depends on.",
+  "n_utterances": 2211,
+  "n_conversations": 122,
+  "class_balance": {
+    "change": 1425,
+    "sustain": 786
+  },
+  "majority_floor_accuracy": 0.6445,
+  "n_test": 438,
+  "n_test_conversations": 31,
+  "selected_model": "linear_svm",
+  "models": {
+    "majority_class": {
+      "cv_macro_f1": 0.3916,
+      "cv_macro_f1_sd": 0.0193,
+      "cv_accuracy": 0.6452,
+      "test_accuracy": 0.6416,
+      "test_macro_f1": 0.3908,
+      "test_roc_auc": 0.5,
+      "per_class_f1": {
+        "change": 0.7816,
+        "sustain": 0.0
+      },
+      "confusion_matrix": [
+        [
+          281,
+          0
+        ],
+        [
+          157,
+          0
+        ]
+      ]
+    },
+    "naive_bayes": {
+      "cv_macro_f1": 0.6184,
+      "cv_macro_f1_sd": 0.052,
+      "cv_accuracy": 0.674,
+      "test_accuracy": 0.6484,
+      "test_macro_f1": 0.6178,
+      "test_roc_auc": 0.6923,
+      "per_class_f1": {
+        "change": 0.726,
+        "sustain": 0.5096
+      },
+      "confusion_matrix": [
+        [
+          204,
+          77
+        ],
+        [
+          77,
+          80
+        ]
+      ]
+    },
+    "logistic_regression": {
+      "cv_macro_f1": 0.6483,
+      "cv_macro_f1_sd": 0.0396,
+      "cv_accuracy": 0.6903,
+      "test_accuracy": 0.6416,
+      "test_macro_f1": 0.6075,
+      "test_roc_auc": 0.6734,
+      "per_class_f1": {
+        "change": 0.7231,
+        "sustain": 0.4919
+      },
+      "confusion_matrix": [
+        [
+          205,
+          76
+        ],
+        [
+          81,
+          76
+        ]
+      ]
+    },
+    "linear_svm": {
+      "cv_macro_f1": 0.6528,
+      "cv_macro_f1_sd": 0.0502,
+      "cv_accuracy": 0.6931,
+      "test_accuracy": 0.653,
+      "test_macro_f1": 0.6159,
+      "test_roc_auc": 0.6601,
+      "per_class_f1": {
+        "change": 0.7352,
+        "sustain": 0.4967
+      },
+      "confusion_matrix": [
+        [
+          211,
+          70
+        ],
+        [
+          82,
+          75
+        ]
+      ]
+    },
+    "random_forest": {
+      "cv_macro_f1": 0.5864,
+      "cv_macro_f1_sd": 0.045,
+      "cv_accuracy": 0.6892,
+      "test_accuracy": 0.637,
+      "test_macro_f1": 0.5352,
+      "test_roc_auc": 0.66,
+      "per_class_f1": {
+        "change": 0.7527,
+        "sustain": 0.3176
+      },
+      "confusion_matrix": [
+        [
+          242,
+          39
+        ],
+        [
+          120,
+          37
+        ]
+      ]
+    },
+    "xgboost": {
+      "cv_macro_f1": 0.6128,
+      "cv_macro_f1_sd": 0.0595,
+      "cv_accuracy": 0.6813,
+      "test_accuracy": 0.6279,
+      "test_macro_f1": 0.5746,
+      "test_roc_auc": 0.6404,
+      "per_class_f1": {
+        "change": 0.7251,
+        "sustain": 0.424
+      },
+      "confusion_matrix": [
+        [
+          215,
+          66
+        ],
+        [
+          97,
+          60
+        ]
+      ]
+    },
+    "lightgbm": {
+      "cv_macro_f1": 0.5989,
+      "cv_macro_f1_sd": 0.0488,
+      "cv_accuracy": 0.6869,
+      "test_accuracy": 0.6461,
+      "test_macro_f1": 0.563,
+      "test_roc_auc": 0.6604,
+      "per_class_f1": {
+        "change": 0.7536,
+        "sustain": 0.3725
+      },
+      "confusion_matrix": [
+        [
+          237,
+          44
+        ],
+        [
+          111,
+          46
+        ]
+      ]
+    },
+    "mlp": {
+      "cv_macro_f1": 0.5867,
+      "cv_macro_f1_sd": 0.0794,
+      "cv_accuracy": 0.692,
+      "test_accuracy": 0.6644,
+      "test_macro_f1": 0.6057,
+      "test_roc_auc": 0.6937,
+      "per_class_f1": {
+        "change": 0.7578,
+        "sustain": 0.4535
+      },
+      "confusion_matrix": [
+        [
+          230,
+          51
+        ],
+        [
+          96,
+          61
+        ]
+      ]
+    }
+  }
+}

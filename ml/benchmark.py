@@ -274,8 +274,16 @@ def classifiers(n_classes: int) -> dict:
             colsample_bytree=0.4,
             reg_lambda=1.0,
             tree_method="hist",
-            objective="multi:softprob",
-            num_class=n_classes,
+            # Binary needs the logistic objective; passing num_class=2 with a
+            # multiclass objective makes XGBoost emit one-hot predictions that
+            # scikit-learn's metrics then refuse. Both AnnoMI tasks here have
+            # three or more classes, so this branch only matters for the
+            # change-vs-sustain study that reuses this configuration.
+            **(
+                {"objective": "multi:softprob", "num_class": n_classes}
+                if n_classes > 2
+                else {"objective": "binary:logistic"}
+            ),
             n_jobs=-1,
             random_state=RANDOM_STATE,
             verbosity=0,
