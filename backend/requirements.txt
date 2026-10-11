@@ -14,6 +14,16 @@ joblib>=1.3
 
 # --- multimodal tier (M12-M15, M19). Optional at runtime: these modules
 #     report "not available" and the text pipeline is unaffected if absent. ---
+#
+# REQUIRES PYTHON 3.12 OR OLDER. The pin below is not cosmetic: app/nlp/review.py
+# is written against MediaPipe's legacy `mp.solutions` API, which was removed in
+# 0.10.30. No release carrying `mp.solutions` publishes a Python 3.13 wheel, so
+# on 3.13 pip silently resolves to 0.10.3x and every video analysis fails. The
+# failure is reported clearly by review.py rather than crashing, but the video
+# tier simply will not work until the interpreter is 3.12 or older.
+#
+#   python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
+#
 librosa>=0.10
 soundfile>=0.12
 opencv-python-headless>=4.9

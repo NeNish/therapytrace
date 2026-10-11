@@ -42,7 +42,18 @@ export default function CaseTrace() {
   const addSession = async (e) => {
     e.preventDefault()
     if (transcript.trim().length < 20) {
-      setError('That transcript is too short to score. Paste a full session.')
+      // A video or audio file attached here is NOT ignored — it is fused on top
+      // of the language score. But the trajectory index is built from language,
+      // so a session row cannot exist without a transcript. Say that, rather
+      // than letting the attachment look like it was thrown away.
+      setError(
+        (videoPath || audioPath)
+          ? 'The recording was uploaded, but a session still needs its transcript: '
+            + 'the progress index is computed from language, and the recording is '
+            + 'fused on top of it. Paste the transcript and both are used. '
+            + 'To analyse the recording on its own, use the Multimodal page.'
+          : 'That transcript is too short to score. Paste a full session.'
+      )
       return
     }
     setBusy(true); setError(null)

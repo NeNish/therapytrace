@@ -34,10 +34,21 @@ function Channel({ tag, title, role, primary, active, children }) {
 
 function InsightPanel({ title, insights, kind }) {
   if (!insights?.available) {
+    // A channel that is empty because nothing was uploaded is a normal state and
+    // stays quiet. A channel that failed for a fixable reason is an error, and
+    // must not be dressed as the same muted grey note — that is what made a
+    // broken dependency look like an ignored upload.
+    const fixable = insights?.remediable
     return (
-      <div className="panel" style={{ opacity: 0.7 }}>
+      <div className="panel" style={fixable ? { borderColor: 'var(--warn, #B4541F)' } : { opacity: 0.7 }}>
+        {fixable && <div className="topline" style={{ background: 'var(--warn, #B4541F)' }} />}
         <h2>{title}</h2>
-        <p className="small muted">
+        {fixable && (
+          <p className="small" style={{ color: 'var(--warn, #B4541F)', fontWeight: 600, marginBottom: 4 }}>
+            This channel could not run
+          </p>
+        )}
+        <p className={fixable ? 'small' : 'small muted'}>
           {insights?.reason || `No ${kind} input supplied — upload a file or paste a transcript to activate this channel.`}
         </p>
       </div>

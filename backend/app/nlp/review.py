@@ -109,6 +109,23 @@ def analyse_video(
     except ImportError:
         return {"available": False, "reason": "opencv or mediapipe not installed"}
 
+    # MediaPipe removed the legacy `mp.solutions` namespace in 0.10.30. This
+    # module is written against it, so on a newer build every call below would
+    # raise AttributeError — which, uncaught, surfaced as an HTTP 500 and looked
+    # from the browser like the upload being silently ignored. Check once, and
+    # say what to do about it.
+    if not hasattr(mp, "solutions"):
+        return {
+            "available": False,
+            "reason": (
+                f"MediaPipe {getattr(mp, '__version__', 'unknown')} does not provide "
+                "the Solutions API this module uses (removed in 0.10.30). "
+                "Install the pinned version: pip install mediapipe==0.10.14 "
+                "(needs Python 3.12 or older)."
+            ),
+            "remediable": True,
+        }
+
     if not Path(video_path).exists():
         return {"available": False, "reason": f"video not found: {video_path}"}
 
@@ -122,11 +139,18 @@ def analyse_video(
         total = min(total, int(max_seconds * fps))
     step = max(1, int(round(fps / sample_fps)))
 
-    pose = mp.solutions.pose.Pose(
-        static_image_mode=False, model_complexity=1,
-        min_detection_confidence=0.5, min_tracking_confidence=0.5,
-    )
-    face = mp.solutions.face_detection.FaceDetection(min_detection_confidence=0.5)
+    try:
+        pose = mp.solutions.pose.Pose(
+            static_image_mode=False, model_complexity=1,
+            min_detection_confidence=0.5, min_tracking_confidence=0.5,
+        )
+        face = mp.solutions.face_detection.FaceDetection(min_detection_confidence=0.5)
+    except Exception as exc:  # model bundle missing, GPU/delegate failure, …
+        cap.release()
+        return {
+            "available": False,
+            "reason": f"MediaPipe could not start its pose/face models: {exc}",
+        }
 
     signals: list[FrameSignals] = []
     prev_wrists = prev_nose = None

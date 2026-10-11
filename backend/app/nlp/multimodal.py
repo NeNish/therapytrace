@@ -509,7 +509,15 @@ def run_multimodal_analysis(payload: dict) -> dict:
                 "role": "posture and movement observation",
             }
         else:
-            channels["video"] = {"available": False, "reason": review.get("reason", "video unusable")}
+            # `remediable` marks a reason the user can act on (a wrong dependency
+            # version, say) as opposed to one they cannot (no file supplied).
+            # The interface styles the two differently; without this they read
+            # identically and a fixable setup error looks like an empty channel.
+            channels["video"] = {
+                "available": False,
+                "reason": review.get("reason", "video unusable"),
+                "remediable": bool(review.get("remediable")),
+            }
     else:
         channels["video"] = {
             "available": False,
