@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy import select
@@ -299,10 +300,86 @@ def model_info():
                 "algorithm": "TF-IDF (1-2 gram) + TherapyTrace lexicon -> logistic regression",
                 "held_out_accuracy": REPORTED_METRICS["therapist"]["accuracy"],
                 "held_out_macro_f1": REPORTED_METRICS["therapist"]["macro_f1"],
-                "role": "Replaces the regex intervention taxonomy in M6 with a "
-                        "classifier trained on MISC-coded data.",
+                "role": "Sets the coarse behaviour family in M6; the regex "
+                        "taxonomy then names the subtype within that family.",
             },
         ],
+    }
+
+
+@router.get("/benchmark")
+def benchmark_results():
+    """
+    M21 — every classifier that was compared, not only the one that shipped.
+
+    Reads ml/artifacts/benchmark.json and returns a trimmed view. The file is
+    the artifact the training run wrote, so these numbers cannot drift from
+    what was actually measured: there is no second copy to keep in step.
+
+    Reporting all seven rather than the winner is the point. The gaps between
+    them are mostly inside the fold-to-fold noise, and a table that showed only
+    the best model would hide exactly that.
+    """
+    import json
+
+    path = Path(__file__).resolve().parents[3] / "ml" / "artifacts" / "benchmark.json"
+    if not path.exists():
+        return {"available": False, "reason": "benchmark.json not present in this build."}
+
+    try:
+        raw = json.loads(path.read_text())
+    except Exception:
+        return {"available": False, "reason": "benchmark.json could not be read."}
+
+    tasks = []
+    for key, t in raw.get("tasks", {}).items():
+        rows = []
+        for name in raw.get("model_order", []):
+            m = t["models"].get(name)
+            if not m:
+                continue
+            cv = m["cv"]
+            rows.append({
+                "id": name,
+                "name": raw["display_names"].get(name, name),
+                "cv_macro_f1": cv["macro_f1"]["mean"],
+                "cv_macro_f1_sd": cv["macro_f1"]["std"],
+                "cv_accuracy": cv["accuracy"]["mean"],
+                "test_accuracy": m["test"]["accuracy"],
+                "test_macro_f1": m["test"]["macro_f1"],
+                "test_weighted_f1": m["test"]["weighted_f1"],
+                "test_roc_auc": m["test"]["macro_roc_auc"],
+                "per_class_recall": m.get("per_class_recall", {}),
+                "fit_seconds": m.get("fit_seconds_clean"),
+                "p_vs_best": (m.get("vs_best") or {}).get("p_value"),
+                "is_selected": name == t["selected_model"],
+                "is_baseline": name == "majority_class",
+            })
+        tasks.append({
+            "id": key,
+            "label": t["label"],
+            "classes": t["class_names"],
+            "class_balance": t["class_balance"],
+            "n_utterances": t["n_utterances"],
+            "n_conversations": t["n_conversations"],
+            "n_test": t["n_test"],
+            "n_test_conversations": t["n_test_conversations"],
+            "selected_model": t["selected_model"],
+            "models": rows,
+        })
+
+    return {
+        "available": True,
+        "dataset": raw.get("dataset"),
+        "protocol": raw.get("protocol", {}),
+        "deployed": "logistic_regression",
+        "deployed_note": (
+            "Selection on macro-F1 picked a different model, but the interface "
+            "depends on detecting sustain talk, and logistic regression has the "
+            "best sustain recall of the seven. The deployment criterion is "
+            "sustain recall, not macro-F1."
+        ),
+        "tasks": tasks,
     }
 
 

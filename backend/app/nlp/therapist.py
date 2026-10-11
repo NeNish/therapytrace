@@ -53,19 +53,90 @@ INTERVENTION_LABELS = {
 }
 
 
-def tag_intervention(text: str) -> str:
+# Which coarse behaviour family each fine-grained label belongs to. The trained
+# model predicts the family; the regex taxonomy names the subtype inside it.
+FAMILY_OF = {
+    "open_question": "question",
+    "closed_question": "question",
+    "simple_reflection": "reflection",
+    "complex_reflection": "reflection",
+    "summary": "reflection",
+    "affirmation": "therapist_input",
+    "psychoeducation": "therapist_input",
+    "directive": "therapist_input",
+    "challenge": "therapist_input",
+    "minimal_encourager": "other",
+    "other": "other",
+}
+
+# Used when the model is confident about the family but no pattern matches
+# inside it — better than falling back to a label from the wrong family.
+FAMILY_DEFAULT = {
+    "question": "open_question",
+    "reflection": "simple_reflection",
+    "therapist_input": "psychoeducation",
+    "other": "other",
+}
+
+
+def tag_intervention(text: str, family: str | None = None) -> str:
+    """
+    Name the intervention, optionally constrained to a behaviour family.
+
+    Without `family` this is the original regex taxonomy, kept intact so the
+    system still works on a machine with no trained artifacts.
+
+    With `family` — supplied by the AnnoMI-trained behaviour model — the search
+    is restricted to patterns belonging to that family. This is the division of
+    labour each method is actually good at. The model was trained on thousands
+    of expert-annotated turns and decides reliably whether something is a
+    question, a reflection or the therapist supplying content; it has no notion
+    of *open* versus *closed*. The patterns cannot tell a reflection from a
+    statement, but they are precise about the subtype once the family is known.
+    Neither alone is as good as the pair.
+    """
     t = text.strip()
     for name, patterns in COMPILED:
+        if family is not None and FAMILY_OF.get(name) != family:
+            continue
         for rx in patterns:
             if rx.search(t):
                 return name
+
+    if family is not None:
+        return FAMILY_DEFAULT.get(family, "other")
     return "open_question" if t.endswith("?") else "other"
+
+
+def _behaviour_families(turns: list[Turn]) -> dict[int, str]:
+    """
+    Model-predicted family for every therapist turn, in one batched call.
+
+    Batched deliberately: classifying turn by turn would re-enter the sklearn
+    pipeline once per utterance and dominate the cost of analysing a session.
+    Returns an empty mapping when no model is loaded, and every caller treats
+    that as "fall back to the patterns" rather than as an error.
+    """
+    idxs = [t.idx for t in turns if t.speaker == "therapist"]
+    texts = [t.text for t in turns if t.speaker == "therapist"]
+    if not texts:
+        return {}
+    try:
+        from .ml_models import classify_therapist_turns
+
+        out = classify_therapist_turns(texts)
+    except Exception:
+        return {}
+    if not out or not out.get("labels"):
+        return {}
+    return dict(zip(idxs, out["labels"]))
 
 
 def analyse_turn_pairs(turns: list[Turn]) -> list[dict]:
     """One record per therapist turn that has a client turn on both sides."""
     records: list[dict] = []
     cache: dict[int, float] = {}
+    families = _behaviour_families(turns)
 
     def pm(turn: Turn) -> float:
         if turn.idx not in cache:
@@ -89,9 +160,14 @@ def analyse_turn_pairs(turns: list[Turn]) -> list[dict]:
             continue  # a two-word answer carries no measurable shift
 
         before, after = pm(prev_client), pm(next_client)
+        family = families.get(turn.idx)
         records.append({
             "therapist_turn_idx": turn.idx,
-            "intervention": tag_intervention(turn.text),
+            "intervention": tag_intervention(turn.text, family),
+            # Recorded so a reader can see which component produced the label,
+            # rather than having to infer it.
+            "behaviour": family,
+            "tagged_by": "model+lexicon" if family else "lexicon",
             "therapist_text": turn.text,
             "client_next_text": next_client.text,
             "before": round(before, 4),

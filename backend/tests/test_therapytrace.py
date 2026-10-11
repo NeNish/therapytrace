@@ -905,3 +905,75 @@ def test_rollup_no_longer_hands_the_narrative_an_empty_ml_block():
 
     src = inspect.getsource(pipeline.rollup_client)
     assert '"ml": {}' not in src
+
+
+# ---------------------------------------------------------------------------
+# M24 — the therapist classifier actually participates in attribution
+# ---------------------------------------------------------------------------
+
+def test_behaviour_model_sets_the_family_and_lexicon_names_the_subtype():
+    """
+    The claim `ml_models.py` used to make in its docstring and not honour.
+
+    The model decides question / reflection / therapist_input / other; the regex
+    taxonomy then names the subtype inside that family. The combination has to
+    beat the patterns alone, or there is no reason to run the model at all.
+    """
+    from app.nlp.ml_models import available
+    from app.nlp.therapist import FAMILY_OF, analyse_turn_pairs, tag_intervention
+    from app.nlp.transcript import parse_transcript
+
+    transcript = (
+        "THERAPIST: How has the week been?\n"
+        "CLIENT: Bad. He always does this and there is nothing I can do, so I sat there.\n"
+        "THERAPIST: So part of you wanted to speak up, and part needed it to stay quiet.\n"
+        "CLIENT: Yeah. I shut down because I was scared he would escalate, and I resented it.\n"
+        "THERAPIST: Most people in that position would do the same. It is a common response to threat.\n"
+        "CLIENT: I had not thought of it that way before, and it does make me feel less stupid.\n"
+    )
+    records = analyse_turn_pairs(parse_transcript(transcript).turns)
+    assert records
+
+    if not available()["therapist_behaviour"]:
+        # Without artifacts the patterns must still carry the whole job.
+        assert all(r["tagged_by"] == "lexicon" for r in records)
+        return
+
+    for r in records:
+        assert r["tagged_by"] == "model+lexicon"
+        assert r["behaviour"] in {"question", "reflection", "therapist_input", "other"}
+        # the subtype must belong to the family the model chose
+        assert FAMILY_OF[r["intervention"]] == r["behaviour"]
+
+    # The psychoeducation turn is the one the patterns alone get wrong: with no
+    # family to constrain it, nothing matches and it falls through to "other".
+    psychoed = [r for r in records if "common response to threat" in r["therapist_text"]]
+    assert psychoed, "expected the psychoeducation turn to form a pair"
+    assert psychoed[0]["intervention"] != "other"
+    assert tag_intervention(psychoed[0]["therapist_text"]) == "other"
+
+
+def test_tagging_still_works_with_no_family_supplied():
+    """Pure-lexicon path must be unchanged for installs with no artifacts."""
+    from app.nlp.therapist import tag_intervention
+
+    assert tag_intervention("What would you want to say to him?") == "open_question"
+    assert tag_intervention("mm hm") == "other"
+
+
+def test_benchmark_endpoint_reports_every_model(client):
+    """The results page must show all seven, not just the one that shipped."""
+    body = client.get("/api/benchmark").json()
+    if not body.get("available"):
+        return  # benchmark.json not shipped in this build
+
+    assert body["deployed"] == "logistic_regression"
+    assert len(body["tasks"]) == 2
+    for task in body["tasks"]:
+        names = [m["id"] for m in task["models"]]
+        assert "majority_class" in names
+        assert len(names) == 8, names  # seven learners plus the floor
+        assert sum(1 for m in task["models"] if m["is_selected"]) == 1
+        for m in task["models"]:
+            assert 0.0 <= m["test_accuracy"] <= 1.0
+            assert 0.0 <= m["test_macro_f1"] <= 1.0

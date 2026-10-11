@@ -16,9 +16,13 @@ Why this matters beyond adding a number:
     validation of the five lexicon dimensions against expert judgement —
     validation check 3 in the methodology.
 
-  * The behaviour model replaces the regex intervention taxonomy in M6 with a
-    classifier trained on MISC-coded data, so therapist attribution stops
-    depending on hand-written patterns.
+  * The behaviour model sets the coarse family in M6 — question, reflection,
+    therapist input or other — and the regex taxonomy then names the subtype
+    inside that family. Therapist attribution therefore no longer depends on
+    hand-written patterns to decide *what kind of thing* a turn was, only to
+    distinguish open from closed questions and simple from complex reflections
+    once the family is settled. With no artifacts present the patterns handle
+    both jobs, as before.
 
 Both models are calibrated on English motivational-interviewing demonstrations.
 Applying them to other modalities is an assumption, not a guarantee, and the

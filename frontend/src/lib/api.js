@@ -32,6 +32,7 @@ export const api = {
   insights: (id) => request(`/clients/${id}/insights`),
   profile: (id) => request(`/clients/${id}/profile`),
   models: () => request('/models'),
+  benchmark: () => request('/benchmark'),
   uploadMedia: (file) => {
     const fd = new FormData()
     fd.append('file', file)

@@ -250,6 +250,10 @@ td { padding: 9px 10px; border-bottom: 1px solid var(--rule-soft); vertical-alig
 tr.clickable:hover { background: #eef0eb; cursor: pointer; }
 
 td.num { font-family: var(--data); font-variant-numeric: tabular-nums; text-align: right; }
+/* Headers marked .num follow their column. Without this a wide numeric column
+   leaves its heading stranded at the left while the figures sit at the right,
+   and the eye stops being able to pair them. */
+th.num { text-align: right; }
 
 /* --- controls ---------------------------------------------------------- */
 
