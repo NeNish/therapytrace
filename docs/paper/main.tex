@@ -133,6 +133,16 @@ and found the mapping far weaker than applied work assumes
 \cite{barrett2019}; we take this as a prohibition rather than a caveat and
 emit no emotion inference from video.
 
+Language has been modelled longitudinally, but outside the clinic. Tsakalidis
+et al.\ identify ``moments of change'' in mood from sequences of a user's own
+posts, distinguishing abrupt switches from gradual escalations and arguing for
+temporally sensitive evaluation \cite{tsakalidis2022moments}; the CLPsych 2022
+shared task built on the same framing \cite{tsakalidis2022}. That work
+establishes both the value of the per-person timeline and the measurement
+problems it raises. Its substrate is social media, where posts are frequent
+and self-authored. A course of therapy offers perhaps twelve observations of
+dialogue, which is the regime this paper addresses.
+
 \subsection{Process coding in motivational interviewing}
 Motivational interviewing supplies the most developed process-coding
 tradition, formalised in the MITI instrument \cite{moyers2016}. The
@@ -154,7 +164,15 @@ scoring \cite{cohen2022}, client coding with commitment strength
 \cite{hoang2024}, LLM-augmented corpus expansion \cite{kumar2024}, and
 multimodal context models \cite{m3tcm2024}. Every one of these classifies,
 generates or simulates a single utterance; none models the client as a subject
-measured repeatedly.
+measured repeatedly. The same unit of analysis holds in the wider literature
+on automated behavioural coding: Chen et al.\ transfer across corpora and
+augment tasks to code psychotherapy conversations under low-resource
+conditions \cite{chen2022lowresource}, and Pellemans et al.\ apply automated
+MI coding to a chat-based suicide prevention helpline
+\cite{pellemans2024} --- in both cases the object classified is the utterance.
+A recent survey of large language models in psychotherapy reaches the same
+conclusion across 69 studies, naming temporal modelling as an open direction
+\cite{na2025survey}.
 
 We note a methodological hazard. Reported figures on this corpus vary widely
 and the split protocol is frequently unstated. Utterances within a
@@ -165,11 +183,17 @@ whose protocol is unknown.
 
 \subsection{Quantification and prevalence estimation}
 Estimating class prevalence from the output of an imperfect classifier is
-known as quantification \cite{forman2008}. Counting predicted labels is a
-biased estimator; corrections include adjusting outputs for shifted priors
-\cite{saerens2002} and adjusted classify-and-count. To our knowledge this
-machinery has not been applied to the question of what a clinical dashboard
-should display, which is the gap this paper addresses.
+known as quantification \cite{forman2008}, now a developed subfield with a
+dedicated monograph \cite{esuli2023}. Counting predicted labels is a biased
+estimator; corrections include adjusting outputs for shifted priors
+\cite{saerens2002} and adjusted classify-and-count. A recent comparison of
+24 quantification algorithms over more than 40 datasets finds that no single
+method dominates and that relative performance depends on sample size and the
+degree of prior shift \cite{schumacher2025}, which is consistent with the
+instability we observe for adjusted classify-and-count at the sample sizes a
+single session provides. To our knowledge this machinery has not been applied
+to the question of what a clinical dashboard should display, which is the gap
+this paper addresses.
 
 % ===================================================================
 \section{Method}
