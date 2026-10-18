@@ -130,9 +130,12 @@ export default function CaseTrace() {
       </div>
       <h1>{client.code}</h1>
       <p className="lede">
+        {/* Written as a sentence. The old form chained the three facts with
+            middle dots, which reads as metadata rather than as a description of
+            a person someone is treating. */}
         {client.presenting_issue || 'No presenting issue recorded'}
-        {client.modality ? ` · ${client.modality}` : ''}
-        {client.therapist_code ? ` · therapist ${client.therapist_code}` : ''}
+        {client.modality ? `, seen in ${client.modality}` : ''}
+        {client.therapist_code ? ` with ${client.therapist_code}` : ''}
       </p>
 
       {error && <div className="notice">{error}</div>}

@@ -140,8 +140,8 @@ export default function Trace({
           stroke="var(--ink-3)" strokeWidth="1" strokeDasharray="1 4"
         />
         <text x={pad.left + 4} y={y(60) - 5} fontFamily="var(--data)" fontSize="9"
-              fill="var(--ink-3)" letterSpacing="1.4">
-          OWN BASELINE ±1 SD
+              fill="var(--ink-3)" letterSpacing="0.2">
+          This client's usual range
         </text>
 
 
@@ -173,9 +173,9 @@ export default function Trace({
             />
             <text
               x={x(changePoint.index) + 8} y={pad.top - 7}
-              fontFamily="var(--data)" fontSize="9" fill="var(--mark)" letterSpacing="0.6"
+              fontFamily="var(--data)" fontSize="9" fill="var(--mark)" letterSpacing="0.2"
             >
-              SHIFT {changePoint.shift > 0 ? '+' : ''}{changePoint.shift} PTS
+              Shift {changePoint.shift > 0 ? '+' : ''}{changePoint.shift} pts
             </text>
           </g>
         )}
@@ -283,13 +283,13 @@ export default function Trace({
         })}
 
         <text x={pad.left} y={H - 8} fontFamily="var(--data)" fontSize="9"
-              fill="var(--ink-3)" letterSpacing="1.4">
-          SESSION
+              fill="var(--ink-3)" letterSpacing="0.2">
+          Session
         </text>
         {measurePath && (
           <text x={pad.left + innerW} y={H - 8} textAnchor="end" fontFamily="var(--data)"
-                fontSize="9" fill="var(--ink-3)" letterSpacing="1">
-            DASHED — SELF-REPORT, INVERTED
+                fontSize="9" fill="var(--ink-3)" letterSpacing="0.2">
+            Dashed line: self-report, inverted
           </text>
         )}
       </svg>

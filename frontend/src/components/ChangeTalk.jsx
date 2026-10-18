@@ -75,11 +75,11 @@ export default function ChangeTalk({ points = [], selected = null, onSelect, hei
         ))}
 
         <text x={pad.left} y={14} fontFamily="var(--data)" fontSize="9"
-              fill="var(--ink-3)" letterSpacing="1.4">
-          CHANGE TALK — SHARE OF DIRECTIONAL TURNS, BIAS-CORRECTED
+              fill="var(--ink-3)" letterSpacing="0.2">
+          Change talk as a share of directional turns, bias-corrected
         </text>
 
-        <path d={path.trim()} fill="none" stroke="var(--mark)" strokeWidth="2"
+        <path d={path.trim()} fill="none" stroke="var(--series-2)" strokeWidth="2"
               strokeLinejoin="round" strokeLinecap="round" />
 
         {points.map((p, i) => {
@@ -96,13 +96,13 @@ export default function ChangeTalk({ points = [], selected = null, onSelect, hei
               <rect x={x(i) - 14} y={pad.top} width={28} height={innerH} fill="transparent" />
               {p.lo !== null && p.lo !== undefined && p.hi !== null && p.hi !== undefined && (
                 <line x1={x(i)} x2={x(i)} y1={y(p.hi)} y2={y(p.lo)}
-                      stroke="var(--mark)" strokeWidth="1.25" opacity="0.45" />
+                      stroke="var(--series-2)" strokeWidth="1.25" opacity="0.45" />
               )}
               <circle
                 cx={x(i)} cy={y(p.ratio)} r={r}
                 /* hollow = interval too wide to read as a point estimate */
-                fill={p.wide ? 'var(--panel)' : 'var(--mark)'}
-                stroke="var(--mark)" strokeWidth="1.75"
+                fill={p.wide ? 'var(--surface)' : 'var(--series-2)'}
+                stroke="var(--series-2)" strokeWidth="1.75"
               />
               <text x={x(i)} y={H - 10} textAnchor="middle" fontFamily="var(--data)"
                     fontSize="9" fill={isActive ? 'var(--ink)' : 'var(--ink-3)'}>

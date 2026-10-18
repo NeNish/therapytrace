@@ -12,31 +12,58 @@
    ========================================================================== */
 
 :root {
-  --ink: #121c1b;
-  --ink-2: #2d3d3a;
-  --ink-3: #5a6e6b;
-  --paper: #edf0eb;
-  --panel: #fbfcfa;
-  --rule: #cfd5cc;
-  --rule-soft: #e2e6df;
+  /* Cool grey-green paper rather than the warm cream this started with. The
+     measurement surfaces sit a shade lighter so a chart reads as something
+     laid on the desk, not a box drawn on it. */
+  --ground: #122124;      /* the spine: deep petrol, the one dark surface */
+  --ground-2: #1B3034;
+  --paper: #E9ECEC;
+  --surface: #FCFDFD;
+  --surface-2: #F2F5F4;
 
-  --gain: #176352;
-  --regress: #8b2646;
-  --hold: #5a6e6b;
-  --mark: #b07510;
+  --ink: #0F1A1C;
+  --ink-2: #3A4A4D;
+  --ink-3: #6B7B7D;
+  --on-ground: #DCE5E4;
+  --on-ground-dim: #7E9497;
 
-  --gain-wash: #d8ece4;
-  --regress-wash: #f5dfe5;
-  --mark-wash: #f7edd7;
+  --rule: #D2D9D8;
+  --rule-soft: #E2E7E6;
 
-  --display: 'IBM Plex Sans Condensed', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --body: 'IBM Plex Serif', Georgia, Cambria, serif;
-  --data: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+  /* Two kinds of statement, two families of colour. Teal and garnet say the
+     client moved. Brass says TherapyTrace is speaking for itself — a change
+     point it found, a verdict about its own precision. Keeping them apart
+     stops the interface sounding equally sure about both. */
+  --gain: #156B5C;
+  --loss: #8A2F46;
+  --hold: #5D6E70;
+  --brass: #A8762C;
 
-  --shadow-sm: 0 1px 3px rgba(18, 28, 27, 0.05), 0 1px 2px rgba(18, 28, 27, 0.03);
-  --shadow-md: 0 4px 12px rgba(18, 28, 27, 0.06), 0 1px 3px rgba(18, 28, 27, 0.04);
-  --radius-xs: 2px;
-  --radius-sm: 4px;
+  --gain-wash: #D9EAE4;
+  --loss-wash: #F4DFE4;
+  --brass-wash: #F6ECD9;
+
+  /* Second measured series: the classifier's change-talk ratio. Distinct from
+     the TPI's ink line and from brass, because it is a different measurement
+     of the same person rather than a remark by the system. */
+  --series-2: #3C5A77;
+
+  /* Aliases kept so the panels written against the old names still render. */
+  --regress: var(--loss);
+  --mark: var(--brass);
+  --mark-wash: var(--brass-wash);
+  --regress-wash: var(--loss-wash);
+  --panel: var(--surface);
+
+  --display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --body: 'Archivo', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --data: 'Archivo', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  --shadow-sm: 0 1px 2px rgba(15, 26, 28, 0.04);
+  --shadow-md: 0 12px 28px -18px rgba(15, 26, 28, 0.35);
+  --radius-xs: 3px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
 }
 
 * { box-sizing: border-box; }
@@ -46,18 +73,12 @@ html, body, #root { height: 100%; }
 body {
   margin: 0;
   color: var(--ink);
-  background-color: var(--paper);
-  /* Precision chart paper background */
-  background-image:
-    linear-gradient(to right, rgba(18, 28, 27, 0.04) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(18, 28, 27, 0.04) 1px, transparent 1px),
-    linear-gradient(to right, rgba(18, 28, 27, 0.02) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(18, 28, 27, 0.02) 1px, transparent 1px);
-  background-size: 40px 40px, 40px 40px, 8px 8px, 8px 8px;
+  background: var(--paper);
   font-family: var(--body);
   font-size: 15px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
 }
 
 a { color: inherit; text-decoration: none; }
@@ -67,82 +88,88 @@ a { color: inherit; text-decoration: none; }
 .shell { display: flex; min-height: 100%; }
 
 .rail {
-  width: 220px;
-  flex: 0 0 220px;
-  border-right: 1px solid var(--rule);
-  background: #f7f9f6;
-  padding: 26px 0;
+  width: 232px;
+  flex: 0 0 232px;
+  background: var(--ground);
+  color: var(--on-ground);
+  padding: 30px 0 22px;
   position: sticky;
   top: 0;
   height: 100vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 1px 0 6px rgba(18, 28, 27, 0.02);
+  border-right: none;
 }
 
+/* One dark surface in the whole app. It makes the content read as lit paper
+   beside it, which is the effect a second light panel could not produce. */
 .rail-mark {
   font-family: var(--display);
-  font-weight: 700;
-  font-size: 20px;
-  letter-spacing: 0.02em;
-  padding: 0 22px 4px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  font-optical-sizing: auto;
+  font-weight: 600;
+  font-size: 23px;
+  letter-spacing: -0.015em;
+  color: #fff;
+  padding: 0 26px 2px;
+  display: block;
 }
 
 .rail-mark span {
-  color: var(--gain);
-  background: var(--gain-wash);
-  padding: 1px 6px;
-  border-radius: var(--radius-xs);
-  font-size: 18px;
+  color: inherit;
+  background: none;
+  padding: 0;
+  font-size: inherit;
 }
 
 .rail-sub {
-  font-family: var(--data);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  color: var(--ink-3);
-  padding: 0 22px 24px;
+  font-family: var(--body);
+  font-size: 12.5px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--on-ground-dim);
+  padding: 0 26px 30px;
 }
 
-.rail nav { display: flex; flex-direction: column; gap: 2px; }
+.rail nav { display: flex; flex-direction: column; gap: 1px; }
 
 .rail nav a {
-  font-family: var(--display);
-  font-size: 14px;
-  letter-spacing: 0.02em;
-  color: var(--ink-2);
-  padding: 10px 22px;
-  border-left: 3px solid transparent;
-  transition: all 0.15s ease;
+  font-family: var(--body);
+  font-size: 14.5px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--on-ground-dim);
+  padding: 9px 26px;
+  border-left: 2px solid transparent;
   display: flex;
   align-items: center;
+  transition: color 0.14s ease, background-color 0.14s ease;
 }
 
 .rail nav a:hover {
-  background: rgba(23, 99, 82, 0.06);
-  color: var(--ink);
-  padding-left: 25px;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--on-ground);
+  padding-left: 26px;
 }
 
+
 .rail nav a.active {
-  border-left-color: var(--gain);
-  color: var(--gain);
-  font-weight: 600;
-  background: var(--gain-wash);
+  border-left-color: var(--brass);
+  color: #fff;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.07);
 }
 
 .rail-foot {
   margin-top: auto;
-  padding: 18px 22px 0;
-  border-top: 1px solid var(--rule-soft);
-  font-family: var(--data);
-  font-size: 10px;
-  line-height: 1.5;
-  color: var(--ink-3);
+  padding: 20px 26px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  font-family: var(--body);
+  font-size: 12px;
+  line-height: 1.55;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--on-ground-dim);
 }
 
 .main {
@@ -157,8 +184,8 @@ a { color: inherit; text-decoration: none; }
 .eyebrow {
   font-family: var(--data);
   font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.18em;
+  text-transform: none;
+  letter-spacing: 0.01em;
   color: var(--ink-3);
   margin-bottom: 8px;
   display: flex;
@@ -202,19 +229,37 @@ h3 {
 
 /* --- panels ------------------------------------------------------------ */
 
+/* Three weights, not one. The trace is the thing the product exists to show,
+   so it gets the lifted white surface; supporting panels sit flat on the paper
+   with a rule; forms recede further still. Identical cards for all three was
+   what made the page read as a dump. */
 .panel {
-  background: var(--panel);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
-  padding: 22px 24px;
-  margin-bottom: 22px;
+  padding: 26px 28px;
+  margin-bottom: 20px;
   position: relative;
-  transition: box-shadow 0.2s ease;
 }
 
-.panel:hover {
-  box-shadow: var(--shadow-md);
+/* No hover lift. Nothing happens when you point at a panel, so nothing should
+   move: motion that answers no action is the commonest decorative tic. */
+.panel--lifted { box-shadow: var(--shadow-md); }
+
+.panel--quiet {
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--rule);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 22px 0 4px;
+}
+
+.panel--form {
+  background: var(--surface-2);
+  border: 1px solid var(--rule-soft);
+  box-shadow: none;
 }
 
 .panel.flush { padding: 0; overflow: hidden; }
@@ -239,8 +284,8 @@ h3 {
 .readout-item .k {
   font-family: var(--data);
   font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
+  text-transform: none;
+  letter-spacing: 0.01em;
   color: var(--ink-3);
   margin-bottom: 3px;
 }
@@ -260,8 +305,8 @@ h3 {
   font-family: var(--data);
   font-size: 10.5px;
   font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
+  text-transform: none;
+  letter-spacing: 0.01em;
   padding: 4px 10px;
   border: 1px solid currentColor;
   border-radius: var(--radius-xs);
@@ -278,8 +323,8 @@ table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th {
   font-family: var(--data);
   font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
+  text-transform: none;
+  letter-spacing: 0.01em;
   color: var(--ink-3);
   text-align: left;
   font-weight: 600;
@@ -378,8 +423,8 @@ label {
   display: block;
   font-family: var(--data);
   font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
+  text-transform: none;
+  letter-spacing: 0.01em;
   color: var(--ink-3);
   margin: 0 0 6px;
   font-weight: 500;
@@ -426,8 +471,8 @@ blockquote.regress { border-left-color: var(--regress); }
 blockquote .who {
   font-family: var(--data);
   font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
+  text-transform: none;
+  letter-spacing: 0.01em;
   color: var(--ink-3);
   display: block;
   margin-bottom: 3px;
@@ -857,8 +902,8 @@ blockquote .who {
 .resolv-pill {
   font-family: var(--data);
   font-size: 10.5px;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  text-transform: none;
   padding: 3px 9px;
   border-radius: var(--radius-xs);
   white-space: nowrap;
@@ -893,7 +938,7 @@ blockquote .who {
   font-family: var(--display);
   font-size: 11px;
   letter-spacing: 0.05em;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--ink-3);
 }
 
@@ -928,7 +973,7 @@ blockquote .who {
   font-family: var(--display);
   font-size: 11.5px;
   letter-spacing: 0.05em;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--ink-3);
   list-style: none;
 }
@@ -985,8 +1030,8 @@ blockquote .who {
 .case-summary-item .k {
   font-family: var(--display);
   font-size: 10.5px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  text-transform: none;
   color: var(--ink-3);
 }
 
@@ -1019,8 +1064,8 @@ blockquote .who {
   font-family: var(--display);
   font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  text-transform: none;
   color: var(--ink);
   white-space: nowrap;
 }
@@ -1043,3 +1088,102 @@ h2.section-sub {
   .case-summary-item .v { font-size: 22px; }
   .section-rule { flex-direction: column; gap: 3px; margin-top: 30px; }
 }
+
+
+/* ---------------------------------------------------------------- typography
+   Fraunces on headings only, with optical sizing so the big ones tighten and
+   the small ones stay open. Archivo everywhere else, including every figure:
+   its tabular numerals do the aligning that a monospace face was being used
+   for, without making each label look like a fragment of code. */
+
+h1, h2, h3 {
+  font-family: var(--display);
+  font-optical-sizing: auto;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  color: var(--ink);
+}
+
+h1 { font-size: 34px; line-height: 1.12; letter-spacing: -0.022em; }
+h2 { font-size: 18px; line-height: 1.25; }
+h3 { font-size: 15.5px; line-height: 1.3; }
+
+.page-head h1 { margin-bottom: 4px; }
+
+/* Measured values read as data, not prose. */
+.v, .num, td.num, .case-summary-item .v, .resolv-stat .v {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.005em;
+}
+
+/* Sentence case throughout. Labels name a thing; they are not signage. */
+.case-summary-item .k,
+.resolv-stat .k,
+.section-rule-label,
+.rail-sub {
+  text-transform: none;
+  letter-spacing: 0.01em;
+}
+
+.case-summary-item .k,
+.resolv-stat .k {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-3);
+}
+
+.section-rule-label {
+  font-family: var(--display);
+  font-optical-sizing: auto;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.008em;
+  color: var(--ink);
+}
+
+.section-rule-hint { font-size: 13px; }
+
+.case-summary {
+  border-color: var(--rule);
+  background: var(--rule-soft);
+  border-radius: var(--radius-md);
+}
+
+.case-summary-item { padding: 15px 20px 16px; }
+.case-summary-item .v { font-family: var(--body); font-weight: 500; font-size: 27px; }
+.case-summary-item.is-state .v { font-family: var(--display); font-weight: 600; font-size: 19px; }
+
+/* The one piece of motion in the app: the trace drawing itself in once, on
+   load. It shows the thing the product measures happening. Everything else
+   stays still. */
+@media (prefers-reduced-motion: no-preference) {
+  .trace-line-draw {
+    stroke-dasharray: 1400;
+    stroke-dashoffset: 1400;
+    animation: trace-draw 1100ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+  }
+}
+
+@keyframes trace-draw { to { stroke-dashoffset: 0; } }
+
+:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+
+/* Controls speak in the interface voice, not the display face. A serif button
+   label reads as a heading that happens to be clickable. */
+button, .btn, input, select, textarea {
+  font-family: var(--body);
+  letter-spacing: 0;
+}
+
+button, .btn {
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+}
+
+/* The lifted surface belongs to the trace alone. */
+.panel:first-of-type { box-shadow: var(--shadow-md); }
