@@ -8,6 +8,23 @@ import LiveRecorder from '../components/LiveRecorder'
 import Trace from '../components/Trace'
 import { api, DIMENSION_LABELS, STATE_COPY, stateColor } from '../lib/api'
 
+/**
+ * A labelled rule between stretches of the page.
+ *
+ * The case view runs to about a dozen panels. Rendered as one flat stack they
+ * all carry the same weight, so a reader has no way to tell the trace itself
+ * from the form that adds a session, and the page reads as a dump rather than
+ * a document. These break it into named stretches that can be scanned.
+ */
+function SectionRule({ label, hint }) {
+  return (
+    <div className="section-rule">
+      <span className="section-rule-label">{label}</span>
+      {hint && <span className="section-rule-hint">{hint}</span>}
+    </div>
+  )
+}
+
 export default function CaseTrace() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -120,6 +137,58 @@ export default function CaseTrace() {
 
       {error && <div className="notice">{error}</div>}
 
+      {/* Summary band. The page runs to a dozen panels, and before this you had
+          to scroll past two charts to learn anything at all. These five numbers
+          are what someone opening a case wants first; everything below is the
+          working out. Momentum carries the colour because it is the only item
+          here that is a judgement rather than a measurement. */}
+      {tpi_series.length > 0 && (
+        <div className="case-summary">
+          <div className="case-summary-item">
+            <span className="k">Latest index</span>
+            <span className="v">{tpi_series[tpi_series.length - 1].toFixed(1)}</span>
+          </div>
+          <div className="case-summary-item">
+            <span className="k">Since session 1</span>
+            <span
+              className="v"
+              style={{ color: trajectory.net_change >= 0 ? 'var(--gain)' : 'var(--regress)' }}
+            >
+              {trajectory.net_change > 0 ? '+' : ''}{trajectory.net_change}
+            </span>
+          </div>
+          <div className="case-summary-item">
+            <span className="k">Per session</span>
+            {/* Two decimals, like every other figure in the band. The raw
+                value arrives with four, which read as spurious precision on a
+                slope estimated from a dozen noisy points. */}
+            <span className="v">
+              {trajectory.recent_trend?.slope_per_session != null
+                ? trajectory.recent_trend.slope_per_session.toFixed(2)
+                : '—'}
+            </span>
+          </div>
+          <div className="case-summary-item">
+            <span className="k">Sessions</span>
+            <span className="v">{trajectory.n_sessions}</span>
+          </div>
+          <div className="case-summary-item is-state">
+            <span className="k">Momentum</span>
+            <span
+              className="v"
+              style={{
+                color: momentum?.state === 'improving' ? 'var(--gain)'
+                  : momentum?.state === 'regressing' ? 'var(--regress)' : 'var(--hold)',
+              }}
+            >
+              {momentum?.state === 'improving' ? 'Gaining'
+                : momentum?.state === 'regressing' ? 'Losing ground'
+                : momentum?.state === 'plateauing' ? 'Plateau' : 'Mixed'}
+            </span>
+          </div>
+        </div>
+      )}
+
       {sessions.length > 0 && sessions[sessions.length - 1].confidence < 0.55 && (
         <div className="notice">
           Session {sessions[sessions.length - 1].session_number} has{' '}
@@ -176,39 +245,9 @@ export default function CaseTrace() {
           points={data.change_talk_series || []}
         />
 
-        <div className="readout" style={{ marginTop: 18 }}>
-          <div className="readout-item">
-            <div className="k">Latest TPI</div>
-            <div className="v">{tpi_series.length ? tpi_series[tpi_series.length - 1].toFixed(1) : '—'}</div>
-          </div>
-          <div className="readout-item">
-            <div className="k">Since session 1</div>
-            <div className="v" style={{ color: trajectory.net_change >= 0 ? 'var(--gain)' : 'var(--regress)' }}>
-              {trajectory.net_change > 0 ? '+' : ''}{trajectory.net_change}
-            </div>
-          </div>
-          <div className="readout-item">
-            <div className="k">Recent slope</div>
-            <div className="v">{trajectory.recent_trend?.slope_per_session ?? '—'}</div>
-          </div>
-          <div className="readout-item">
-            <div className="k">Sessions</div>
-            <div className="v">{trajectory.n_sessions}</div>
-          </div>
-          <div className="readout-item">
-            <div className="k">Linguistic Momentum</div>
-            <div className="v" style={{
-              fontSize: 18,
-              color: momentum?.state === 'improving' ? 'var(--gain)' :
-                     momentum?.state === 'regressing' ? 'var(--regress)' : 'var(--hold)',
-            }}>
-              {momentum?.state === 'improving' ? 'Accelerating ↗' :
-               momentum?.state === 'regressing' ? 'Decelerating ↘' :
-               momentum?.state === 'plateauing' ? 'Steady →' : 'Gaining ↑'}
-            </div>
-          </div>
-        </div>
-
+        {/* The five headline numbers moved to the summary band at the top of
+            the page; repeating them here only taught a reader to skip one of
+            the two copies. What stays is the sentence that reads them. */}
         {momentum && (
           <p className="small" style={{ marginTop: 12, marginBottom: 0 }}>
             {momentum.detail}{' '}
@@ -222,6 +261,8 @@ export default function CaseTrace() {
           </p>
         )}
       </div>
+
+      <SectionRule label="This session" hint="Where the latest session sits against the client's own norm" />
 
       {/* ---------------- Session DNA & Turning Point Detector ---------------- */}
       <div className="grid-2">
@@ -478,7 +519,9 @@ export default function CaseTrace() {
       )}
 
       {/* ---------------- dimensions ---------------- */}
-      <h2 style={{ marginTop: 30 }}>What moved</h2>
+      <SectionRule label="Dimension by dimension" hint="Each process dimension against this client's baseline" />
+
+      <h2 className="section-sub">What moved</h2>
       <p className="small muted" style={{ marginTop: -4, marginBottom: 14 }}>
         Dotted line is this client's own baseline on each dimension.
       </p>
@@ -537,6 +580,8 @@ export default function CaseTrace() {
 
       {/* ---------------- validation ---------------- */}
       {validation && (
+        <>
+        <SectionRule label="Evidence" hint="How the index lines up with the questionnaire, session by session" />
         <div className="panel">
           <h2>Against self-report</h2>
           <p className="small muted" style={{ marginTop: -6 }}>
@@ -569,6 +614,7 @@ export default function CaseTrace() {
             </p>
           )}
         </div>
+        </>
       )}
 
       {/* ---------------- sessions ---------------- */}
@@ -610,6 +656,8 @@ export default function CaseTrace() {
           </tbody>
         </table>
       </div>
+
+      <SectionRule label="Add data" hint="Score a new session, or record a questionnaire result" />
 
       <div className="grid-2">
         <div className="panel">
