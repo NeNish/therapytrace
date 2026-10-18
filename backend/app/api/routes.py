@@ -111,6 +111,9 @@ def get_trajectory(client_id: int, db: DbSession = Depends(get_db)):
         # Empty when no session has been scored by the classifier.
         "change_talk_series": roll.get("change_talk_series", []),
         "trajectory": roll.get("trajectory"),
+        # M26. Which reading the evidence supports, for the case as a whole.
+        # The per-session verdicts ride along inside change_talk_series.
+        "resolvability": roll.get("resolvability"),
         "measures": roll.get("measures", []),
         "validation": roll.get("validation"),
         "dimensions": list(DIMENSIONS),

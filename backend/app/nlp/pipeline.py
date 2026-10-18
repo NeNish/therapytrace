@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from .features import DIMENSIONS, session_features
-from .ml_models import session_ml_summary
+from .ml_models import resolvability, session_ml_summary
 from .mechanism import profile_client
 from .narrative import session_note
 from .recommend import recommend
@@ -141,6 +141,32 @@ def rollup_client(session_rows: list[dict], turn_records: list[dict] | None = No
             }
         )
     has_change_talk = any(p["ratio"] is not None for p in change_talk_series)
+
+    # M26. Whether a session's ratio can be read at all is a property of how
+    # many directional turns it contained, and it is measured rather than
+    # assumed. Carried per session so the interface can mark the ones that are
+    # too short, and summarised across the case so it can say which reading the
+    # evidence supports: at the lengths this corpus contains, that is the
+    # direction over several sessions and not any single value.
+    for point in change_talk_series:
+        n_turns = point.get("directional_turns") or 0
+        point["resolvability"] = resolvability(n_turns) if n_turns else {
+            "available": True, "readable": False, "n_turns": 0,
+            "verdict": "No directional turns in this session; nothing to estimate from.",
+            "supported_reading": "trend across sessions",
+        }
+
+    readable_sessions = [
+        p for p in change_talk_series if (p.get("resolvability") or {}).get("readable")
+    ]
+    resolvability_summary = {
+        "n_sessions": len(change_talk_series),
+        "n_readable_alone": len(readable_sessions),
+        "supported_reading": (
+            "single session" if len(readable_sessions) == len(change_talk_series)
+            and change_talk_series else "trend across sessions"
+        ),
+    }
     traj = summarise(tpi_series)
     profile = profile_client(dim_series, turn_records or [])
     features_series = [r["features"] for r in rescored]
@@ -156,6 +182,7 @@ def rollup_client(session_rows: list[dict], turn_records: list[dict] | None = No
         "tpi_series": tpi_series,
         "dimension_series": dim_series,
         "change_talk_series": change_talk_series if has_change_talk else [],
+        "resolvability": resolvability_summary,
         "trajectory": traj,
         "profile": profile,
         "recommendation": recommend(

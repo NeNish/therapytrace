@@ -1,0 +1,133 @@
+{
+  "estimator": "bayesian posterior over true ratio, flat prior",
+  "confusion_source": "held-out AnnoMI conversations, logistic regression",
+  "p_change_given_change": 0.7947,
+  "p_change_given_sustain": 0.4785,
+  "readable_ci_threshold": 0.5,
+  "n_simulations_per_point": 3000,
+  "turns_for_readable_estimate": 40,
+  "turns_for_quarter_scale_comparison": null,
+  "assumptions": "Turns independent; confusion matrix transfers to the scored session. Both optimistic, so these are upper bounds on precision.",
+  "table": [
+    {
+      "turns": 4,
+      "ci80_width": 0.7367,
+      "posterior_sd": 0.2703,
+      "bias": -0.0035,
+      "min_detectable_difference": 1.0704,
+      "readable": false
+    },
+    {
+      "turns": 6,
+      "ci80_width": 0.7082,
+      "posterior_sd": 0.2622,
+      "bias": -0.0056,
+      "min_detectable_difference": 1.0384,
+      "readable": false
+    },
+    {
+      "turns": 8,
+      "ci80_width": 0.6833,
+      "posterior_sd": 0.2492,
+      "bias": 0.0023,
+      "min_detectable_difference": 0.987,
+      "readable": false
+    },
+    {
+      "turns": 10,
+      "ci80_width": 0.6602,
+      "posterior_sd": 0.244,
+      "bias": 0.0028,
+      "min_detectable_difference": 0.9663,
+      "readable": false
+    },
+    {
+      "turns": 12,
+      "ci80_width": 0.6381,
+      "posterior_sd": 0.2363,
+      "bias": -0.0019,
+      "min_detectable_difference": 0.9358,
+      "readable": false
+    },
+    {
+      "turns": 15,
+      "ci80_width": 0.607,
+      "posterior_sd": 0.2287,
+      "bias": -0.0005,
+      "min_detectable_difference": 0.9057,
+      "readable": false
+    },
+    {
+      "turns": 20,
+      "ci80_width": 0.5703,
+      "posterior_sd": 0.2182,
+      "bias": -0.0004,
+      "min_detectable_difference": 0.8642,
+      "readable": false
+    },
+    {
+      "turns": 25,
+      "ci80_width": 0.5365,
+      "posterior_sd": 0.2068,
+      "bias": -0.0008,
+      "min_detectable_difference": 0.8187,
+      "readable": false
+    },
+    {
+      "turns": 30,
+      "ci80_width": 0.5063,
+      "posterior_sd": 0.1976,
+      "bias": 0.0013,
+      "min_detectable_difference": 0.7824,
+      "readable": false
+    },
+    {
+      "turns": 40,
+      "ci80_width": 0.459,
+      "posterior_sd": 0.18,
+      "bias": -0.001,
+      "min_detectable_difference": 0.7127,
+      "readable": true
+    },
+    {
+      "turns": 50,
+      "ci80_width": 0.4228,
+      "posterior_sd": 0.1614,
+      "bias": -0.0051,
+      "min_detectable_difference": 0.6392,
+      "readable": true
+    },
+    {
+      "turns": 60,
+      "ci80_width": 0.3975,
+      "posterior_sd": 0.1593,
+      "bias": -0.0034,
+      "min_detectable_difference": 0.6308,
+      "readable": true
+    },
+    {
+      "turns": 80,
+      "ci80_width": 0.3578,
+      "posterior_sd": 0.1414,
+      "bias": -0.0038,
+      "min_detectable_difference": 0.56,
+      "readable": true
+    },
+    {
+      "turns": 100,
+      "ci80_width": 0.3249,
+      "posterior_sd": 0.125,
+      "bias": 0.0016,
+      "min_detectable_difference": 0.495,
+      "readable": true
+    },
+    {
+      "turns": 120,
+      "ci80_width": 0.3033,
+      "posterior_sd": 0.1212,
+      "bias": 0.0026,
+      "min_detectable_difference": 0.4799,
+      "readable": true
+    }
+  ]
+}

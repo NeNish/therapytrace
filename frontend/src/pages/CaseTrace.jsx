@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import ChangeTalk from '../components/ChangeTalk'
+import Resolvability from '../components/Resolvability'
 import DimensionGrid from '../components/DimensionGrid'
 import LiveRecorder from '../components/LiveRecorder'
 import Trace from '../components/Trace'
@@ -166,6 +167,13 @@ export default function CaseTrace() {
           points={data.change_talk_series || []}
           selected={selected}
           onSelect={(i) => setSelected(i)}
+        />
+
+        {/* States which reading the evidence supports, instead of leaving a
+            reader to infer it from the width of an error bar. */}
+        <Resolvability
+          summary={data.resolvability}
+          points={data.change_talk_series || []}
         />
 
         <div className="readout" style={{ marginTop: 18 }}>
@@ -429,11 +437,18 @@ export default function CaseTrace() {
         <div className="panel">
           <div className="topline" style={{ background: 'var(--gain)' }} />
           <div className="panel-head">
-            <h2>Bayesian-Damped Trajectory Projection (Next 3 Sessions)</h2>
+            {/* Named for what it is. The projection is a damped linear trend,
+                not a Bayesian model: there is no prior and no posterior, so
+                calling its bands "credible intervals" would invite a question
+                the method cannot answer. They are projection bands that widen
+                with distance, and the caveat below says what they are worth. */}
+            <h2>Projected trajectory (next 3 sessions)</h2>
             <span className="state-tag state-gaining">Forward Outlook</span>
           </div>
           <p className="small" style={{ marginTop: -4 }}>
-            {trajectory.forecast.outlook} Modeled via damped auto-regressive momentum with expanding 80% and 95% confidence bands to safeguard against runaway forecasts.
+            {trajectory.forecast.outlook} The recent slope is extrapolated and
+            damped toward zero as it runs forward, so the projection flattens
+            rather than racing away. Bands widen with distance.
           </p>
           <table>
             <thead>
@@ -441,8 +456,8 @@ export default function CaseTrace() {
                 <th>Projected Session</th>
                 <th className="num">Expected TPI</th>
                 <th className="num">Expected Δ vs Today</th>
-                <th className="num">80% Credible Interval</th>
-                <th className="num">95% Credible Interval</th>
+                <th className="num">80% band</th>
+                <th className="num">95% band</th>
               </tr>
             </thead>
             <tbody>

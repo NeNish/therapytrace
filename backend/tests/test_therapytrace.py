@@ -977,3 +977,58 @@ def test_benchmark_endpoint_reports_every_model(client):
         for m in task["models"]:
             assert 0.0 <= m["test_accuracy"] <= 1.0
             assert 0.0 <= m["test_macro_f1"] <= 1.0
+
+
+# ---------------------------------------------------------------- M26
+def test_rupture_screen_is_quiet_on_clients_who_are_not_changing():
+    """
+    The screen must not fire on measurement noise.
+
+    An earlier version alerted on a 6-point single-session drop, which
+    calculate_rci defines as indistinguishable from noise; it raised an alert
+    for about a third of non-changing clients. This pins the recalibrated
+    behaviour so that regression is caught here rather than in a demo.
+    """
+    import random
+
+    from app.nlp.trajectory import SE_MEAS, assess_rupture_risk
+
+    rng = random.Random(7)
+    flagged = 0
+    trials = 2000
+    for _ in range(trials):
+        flat = [50.0 + rng.gauss(0.0, SE_MEAS) for _ in range(12)]
+        if assess_rupture_risk(flat)["level"] != "low":
+            flagged += 1
+    rate = flagged / trials
+    assert rate < 0.09, f"false-alarm rate {rate:.1%} is too high for a clinical screen"
+
+
+def test_rupture_screen_still_catches_a_real_decline():
+    """A screen that never fires is safe and useless; hold it to both numbers."""
+    import random
+
+    from app.nlp.trajectory import SE_MEAS, assess_rupture_risk
+
+    rng = random.Random(11)
+    caught = 0
+    trials = 500
+    for _ in range(trials):
+        declining = [50.0 - 1.2 * i + rng.gauss(0.0, SE_MEAS) for i in range(12)]
+        if assess_rupture_risk(declining)["level"] != "low":
+            caught += 1
+    assert caught / trials > 0.90
+
+
+def test_rupture_screen_never_recommends_treatment():
+    """
+    The licence forbids treatment decisions. The screen reports that a series
+    looks unlike noise; choosing what to do about it is the clinician's.
+    """
+    from app.nlp.trajectory import assess_rupture_risk
+
+    worst = [60.0, 55.0, 50.0, 44.0, 38.0, 31.0, 25.0]
+    out = assess_rupture_risk(worst)
+    blob = (out["note"] + " ".join(out["alerts"])).lower()
+    for banned in ("recommend", "should", "must", "prescrib", "diagnos", "intervene"):
+        assert banned not in blob, f"screen emitted directive language: {banned!r}"

@@ -179,11 +179,25 @@ def calculate_rci(
     reliability: float = 0.82,
 ) -> dict:
     """
-    Jacobson & Truax (1991) Reliable Change Index (RCI).
-    Standard Error of Measurement: S_diff = sqrt(2 * (SE_meas)^2) = sqrt(2 * (SD * sqrt(1 - r_xx))^2)
-    For TPI with scaled personal baseline SD ~ 10 and test-retest reliability r_xx ~ 0.82:
-    S_diff = sqrt(2 * 100 * 0.18) = sqrt(36) = 6.0 points.
-    A change |Δ| >= 1.96 * S_diff (approx 11.76 points) is statistically reliable at p < 0.05.
+    Jacobson & Truax (1991) Reliable Change Index.
+
+        S_diff = sqrt(2 * (SD * sqrt(1 - r_xx))^2)
+
+    With SD = 10 by construction of the TPI and r_xx = 0.82, S_diff = 6.0, so a
+    change of at least 1.96 * S_diff = 11.76 points is reliable at p < 0.05.
+
+    ASSUMPTION, NOT A MEASUREMENT. r_xx is the test-retest reliability of the
+    TPI and it has never been measured: doing so needs repeated sessions from
+    clients who are known to be stable, which this project does not have. The
+    0.82 here is a stand-in, and the only 0.82 elsewhere in the repository is a
+    single cross-validation fold's macro ROC-AUC, which is a different quantity
+    and no justification for this one.
+
+    Everything downstream scales with it: the 11.76-point threshold, and every
+    alliance-strain threshold in assess_rupture_risk, which is expressed in
+    units of S_diff. A lower true reliability widens the band and makes both
+    more conservative. Treat the threshold as provisional and say so in any
+    write-up; do not report it as a validated property of the instrument.
     """
     if len(tpi_series) < 2:
         return {
@@ -236,8 +250,17 @@ def forecast_trajectory(
     baseline_sd: float = 10.0,
 ) -> dict:
     """
-    Bayesian-damped linear trend projection with expanding 80% and 95% confidence bands.
-    Slope shrinks toward zero as horizon increases (damped persistence), avoiding runaway forecasts.
+    Damped linear-trend projection with bands that widen as the horizon grows.
+
+    Not Bayesian, despite an earlier docstring saying so: there is no prior and
+    no posterior here. The recent OLS slope is extrapolated and multiplied by
+    0.85 per step, so the projection flattens toward the present value instead
+    of running away. The bands are heuristic — hist_sd * sqrt(1 + step/2) — and
+    describe how wrong the extrapolation has tended to be, not a posterior over
+    future values. They are labelled "band" in the interface for that reason.
+
+    A projection is the weakest thing on the page. It assumes the recent slope
+    persists, which is exactly what a change point breaks.
     """
     n = len(tpi_series)
     if n < 3:
@@ -284,9 +307,9 @@ def forecast_trajectory(
     final_proj = projections[-1]["projected_tpi"]
     delta = final_proj - latest_val
     if delta >= 4.0:
-        outlook = "Upward trajectory projected; language markers suggest continued momentum."
+        outlook = "Upward trajectory projected if the recent slope persists."
     elif delta <= -4.0:
-        outlook = "Downward trajectory projected; high priority for therapeutic realignment."
+        outlook = "Downward trajectory projected over the next three sessions."
     else:
         outlook = "Plateau/steady trajectory projected across the next 3 sessions."
 
@@ -299,12 +322,37 @@ def forecast_trajectory(
     }
 
 
+# Measurement-error scale for the TPI, from the same assumptions calculate_rci
+# uses. Every threshold below is expressed as a multiple of this, so the alert
+# cannot fire on a movement the instrument is unable to resolve.
+S_DIFF = math.sqrt(2.0 * (10.0 ** 2) * (1.0 - 0.82))      # 6.0 TPI points
+SE_MEAS = 10.0 * math.sqrt(1.0 - 0.82)                     # 4.24 points, single session
+
+# Score cut-offs calibrated by simulation against series with no true change.
+# ml/calibrate_rupture.py reproduces these and prints the resulting rates.
+MODERATE_AT = 0.30
+ELEVATED_AT = 0.55
+FALSE_ALARM_RATE = 0.050   # measured, see ml/calibrate_rupture.py
+DETECTION_RATE = 0.998     # measured, genuine decline of 1.2 TPI points/session
+
+
 def assess_rupture_risk(
     tpi_series: list[float],
 ) -> dict:
     """
-    Rupture and Alliance Risk Detector:
-    Monitors velocity of decline, consecutive drops below baseline, and volatility spikes.
+    Alliance-strain screen over the TPI series.
+
+    This is a screening heuristic, not a clinical instrument, and it is
+    deliberately conservative. An earlier version flagged a 6-point
+    single-session drop, which is inside the band calculate_rci defines as
+    measurement noise; on simulated clients with no true change it raised an
+    alert for roughly one in three. Thresholds are now expressed in units of
+    the measurement error itself and the score cut-offs are calibrated so that
+    a non-changing client reaches "moderate" about 5% of the time.
+
+    What it reports is that the series looks unlike noise, which is a reason to
+    ask the client how the work is going. It is not a finding about the
+    therapeutic alliance, and it does not recommend an intervention.
     """
     n = len(tpi_series)
     if n < 2:
@@ -312,64 +360,82 @@ def assess_rupture_risk(
             "level": "low",
             "score": 0.0,
             "alerts": [],
-            "recommendation": "Baseline gathering phase; monitor rapport building.",
+            "note": "Baseline is still being established.",
+            "false_alarm_rate": FALSE_ALARM_RATE,
+            "detection_rate": DETECTION_RATE,
+            "threshold_points": round(1.96 * S_DIFF, 1),
         }
 
     alerts = []
     score = 0.0
 
-    # 1. Acute single-session drop >= 7 points
+    # 1. A single-session drop large enough to be distinguishable from noise.
+    #    1.96 * S_DIFF is the same bar calculate_rci uses to call a change real.
     last_drop = tpi_series[-1] - tpi_series[-2]
-    if last_drop <= -9.0:
-        score += 0.45
-        alerts.append(f"Acute drop of {abs(last_drop):.1f} TPI points in the latest session.")
-    elif last_drop <= -6.0:
+    if last_drop <= -1.96 * S_DIFF:
+        score += 0.50
+        alerts.append(
+            f"Drop of {abs(last_drop):.1f} points exceeds the "
+            f"{1.96 * S_DIFF:.1f}-point reliable-change threshold."
+        )
+    elif last_drop <= -1.40 * S_DIFF:
         score += 0.25
-        alerts.append(f"Sharp drop of {abs(last_drop):.1f} points from previous session.")
+        alerts.append(f"Drop of {abs(last_drop):.1f} points approaches the reliable-change threshold.")
 
-    # 2. Consecutive declines
+    # 2. A run of declines longer than noise comfortably produces. Under pure
+    #    noise a run of k declines has probability about 2^-k at each position,
+    #    so 3 is common across a dozen sessions and 4 is not.
     consec_down = 0
     for i in range(len(tpi_series) - 1, 0, -1):
         if tpi_series[i] < tpi_series[i - 1]:
             consec_down += 1
         else:
             break
-    if consec_down >= 3:
-        score += 0.40
-        alerts.append(f"Sustained slide across {consec_down} consecutive sessions.")
-    elif consec_down == 2:
-        score += 0.20
-        alerts.append("Downward drift over the last 2 sessions.")
+    if consec_down >= 5:
+        score += 0.45
+        alerts.append(f"Declines in {consec_down} consecutive sessions.")
+    elif consec_down == 4:
+        score += 0.25
+        alerts.append("Declines in 4 consecutive sessions.")
 
-    # 3. Trapped below baseline (< 45) for multiple sessions
-    below_45 = sum(1 for v in tpi_series[-3:] if v < 45.0)
-    if below_45 >= 2:
-        score += 0.30
-        alerts.append("Client language trapped below personal baseline across recent sessions.")
+    # 3. Recent sessions sitting below the personal baseline by more than the
+    #    standard error of their mean, rather than any single dip below 45.
+    recent = tpi_series[-3:]
+    if len(recent) == 3:
+        se_mean = SE_MEAS / math.sqrt(3)
+        if (sum(recent) / 3.0) < 50.0 - 1.96 * se_mean:
+            score += 0.30
+            alerts.append("Last three sessions average below the client's own baseline.")
 
-    # 4. Excessive volatility (standard deviation > 8 in recent window)
+    # 4. Variance materially above what measurement noise alone produces.
     if n >= 4:
         recent_sd = _stdev(tpi_series[-4:])
-        if recent_sd > 8.0:
+        if recent_sd > 2.0 * SE_MEAS:
             score += 0.20
-            alerts.append(f"High erratic variance (SD = {recent_sd:.1f}), indicating relational ambivalence.")
+            alerts.append(f"Session-to-session variation (SD = {recent_sd:.1f}) is unusually wide.")
 
     score = min(1.0, round(score, 2))
-    if score >= 0.55:
+    if score >= ELEVATED_AT:
         level = "elevated"
-        rec = "High risk of therapeutic rupture or disengagement. Recommend exploring therapeutic alliance directly and inviting client feedback."
-    elif score >= 0.30:
+        note = (
+            "The series is moving in a way noise alone rarely produces. "
+            "Worth asking the client how they feel the work is going."
+        )
+    elif score >= MODERATE_AT:
         level = "moderate"
-        rec = "Moderate alliance strain detected. Consider checking in on pacing, goals, or unexpressed ambivalence."
+        note = "Some downward movement beyond measurement error. Worth keeping an eye on."
     else:
         level = "low"
-        rec = "Relational momentum stable; no active rupture markers identified."
+        note = "Nothing in the series stands out from ordinary measurement variation."
 
     return {
         "level": level,
         "score": score,
         "alerts": alerts,
-        "recommendation": rec,
+        "note": note,
+        "false_alarm_rate": FALSE_ALARM_RATE,
+        "detection_rate": DETECTION_RATE,
+        "threshold_points": round(1.96 * S_DIFF, 1),
     }
 
 

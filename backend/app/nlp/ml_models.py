@@ -32,6 +32,7 @@ Applying them to other modalities is an assumption, not a guarantee, and the
 from __future__ import annotations
 
 import functools
+import json
 import math
 from pathlib import Path
 from typing import Any
@@ -303,4 +304,77 @@ def session_ml_summary(
         "client_talk": client,
         "therapist_behaviour": therapist,
         "dataset": "AnnoMI (Wu et al., 2023) — 133 expert-annotated MI dialogues",
+    }
+
+
+# ---------------------------------------------------------------- M26
+_RESOLVABILITY_PATH = (
+    Path(__file__).resolve().parents[3] / "ml" / "artifacts" / "resolvability.json"
+)
+
+
+@functools.lru_cache(maxsize=1)
+def _resolvability_table() -> dict | None:
+    """The measured precision table, or None if it has not been generated."""
+    try:
+        return json.loads(_RESOLVABILITY_PATH.read_text())
+    except (OSError, ValueError):
+        return None
+
+
+def resolvability(n_turns: int) -> dict:
+    """
+    Say whether a session is long enough for its ratio to mean anything.
+
+    The estimate is always computable; that is not the same as it being
+    readable. At the session lengths this corpus actually contains, the 80%
+    credible interval spans roughly two-thirds of the scale, so the midpoint
+    carries almost no information about where the client sits. Showing it
+    without saying so invites a reader to treat noise as a finding, which is
+    the failure this whole project exists to avoid.
+
+    The verdict comes from ml/artifacts/resolvability.json, a table measured by
+    simulating sessions through the estimator that actually ships. It is not a
+    fitted curve and not a rule of thumb. If the table is missing the function
+    says so rather than guessing: no table, no verdict.
+
+    Returns a dict carrying the verdict, the measured interval width, how many
+    more turns would be needed, and which reading the data does support.
+    """
+    tab = _resolvability_table()
+    if tab is None:
+        return {
+            "available": False,
+            "reason": "resolvability table not generated; run ml/resolvability.py",
+        }
+
+    rows = tab["table"]
+    row = min(rows, key=lambda r: abs(r["turns"] - n_turns))
+    need = tab.get("turns_for_readable_estimate")
+    readable = bool(need is not None and n_turns >= need)
+
+    if readable:
+        verdict = "This session is long enough to read as a single value."
+    elif need is not None:
+        verdict = (
+            f"Too short to read on its own: {n_turns} directional turns give an "
+            f"80% interval about {row['ci80_width']:.2f} wide on a 0-1 scale. "
+            f"A single-session reading needs roughly {need}. Read the direction "
+            f"across sessions instead."
+        )
+    else:
+        verdict = "No session length in the calibration reaches a readable interval."
+
+    return {
+        "available": True,
+        "n_turns": int(n_turns),
+        "readable": readable,
+        "ci80_width": row["ci80_width"],
+        "posterior_sd": row["posterior_sd"],
+        "min_detectable_difference": row["min_detectable_difference"],
+        "turns_for_readable_estimate": need,
+        "turns_short_by": (None if readable or need is None else max(0, need - int(n_turns))),
+        "supported_reading": "trend across sessions" if not readable else "single session",
+        "verdict": verdict,
+        "assumptions": tab.get("assumptions"),
     }

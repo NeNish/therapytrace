@@ -20,7 +20,10 @@ export default function App() {
         <div className="rail-sub">Process monitoring</div>
         <nav>
           <NavLink to="/" end>Cases</NavLink>
-          <NavLink to="/studio">🎙️ Live Studio</NavLink>
+          {/* No emoji: it was the only glyph in the nav, which read as an
+              afterthought rather than a system. If icons are wanted later they
+              belong on every item, drawn from one set. */}
+          <NavLink to="/studio">Live Studio</NavLink>
           <NavLink to="/multimodal">Multimodal</NavLink>
           <NavLink to="/bench">Bench</NavLink>
           <NavLink to="/models">Models</NavLink>
