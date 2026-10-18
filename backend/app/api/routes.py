@@ -119,6 +119,31 @@ def get_trajectory(client_id: int, db: DbSession = Depends(get_db)):
 
 def _session_detail(sess: TherapySession) -> dict:
     a = sess.analysis
+    client = sess.client
+    # Compute session-specific suggested questions ONLY if this is the most recent session of the case
+    from ..nlp.recommend import generate_suggested_questions
+    suggested_q = None
+    if client and client.sessions:
+        all_ordered = sorted([s for s in client.sessions if s.analysis], key=lambda x: x.session_number)
+        is_most_recent = bool(all_ordered and all_ordered[-1].id == sess.id)
+        if is_most_recent:
+            tpi_ser = [s.analysis.tpi for s in all_ordered]
+            feat_ser = [s.analysis.features for s in all_ordered]
+            dim_ser = {d: [s.analysis.features.get(d, 0.0) for s in all_ordered] for d in DIMENSIONS}
+            from ..nlp.scoring import build_baseline
+            base_dict = build_baseline([s.analysis.features for s in all_ordered], baseline_k=2).to_dict()
+            from ..nlp.trajectory import summarise
+            traj = summarise(tpi_ser)
+            latest_session_data = {
+                "drivers": a.drivers or {},
+                "ml": a.ml or {},
+                "parse_info": a.parse_info or {},
+                "z_scores": a.z_scores or {},
+            }
+            suggested_q = generate_suggested_questions(
+                tpi_ser, feat_ser, dim_ser, base_dict, trajectory=traj, session_data=latest_session_data
+            )
+
     return {
         "id": sess.id,
         "client_id": sess.client_id,
@@ -136,6 +161,7 @@ def _session_detail(sess: TherapySession) -> dict:
         "therapist_moments": a.therapist_moments,
         "ml": a.ml or {},
         "parse_info": a.parse_info,
+        "suggested_questions": suggested_q,
     }
 
 

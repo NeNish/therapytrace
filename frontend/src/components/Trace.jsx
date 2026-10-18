@@ -16,11 +16,14 @@ export default function Trace({
   series = [],
   changePoint = null,
   measures = [],
+  forecast = null,
+  rci = null,
   onSelect,
   selected = null,
   height = 300,
 }) {
   const [hover, setHover] = useState(null)
+  const [showForecast, setShowForecast] = useState(true)
 
   const W = 900
   const H = height
@@ -31,14 +34,17 @@ export default function Trace({
   const yMin = 25
   const yMax = 80
 
+  const hasForecast = Boolean(showForecast && forecast?.available && forecast?.projections?.length > 0)
+  const totalPoints = series.length + (hasForecast ? forecast.projections.length : 0)
+
   const x = (i) =>
-    pad.left + (series.length <= 1 ? innerW / 2 : (i * innerW) / (series.length - 1))
+    pad.left + (totalPoints <= 1 ? innerW / 2 : (i * innerW) / (totalPoints - 1))
   const y = (v) =>
     pad.top + innerH - ((Math.max(yMin, Math.min(yMax, v)) - yMin) / (yMax - yMin)) * innerH
 
   const path = useMemo(
     () => series.map((v, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' '),
-    [series, height]
+    [series, height, totalPoints]
   )
 
   // PHQ-9 style measures, inverted so "better" points the same way as the trace
@@ -56,7 +62,36 @@ export default function Trace({
         return `${i === 0 ? 'M' : 'L'} ${xx.toFixed(1)} ${yy.toFixed(1)}`
       })
       .join(' ')
-  }, [measures, series.length, height])
+  }, [measures, series.length, height, totalPoints])
+
+  // Forecast projection paths and confidence polygon
+  const forecastPaths = useMemo(() => {
+    if (!hasForecast) return null
+    const lastIdx = series.length - 1
+    const lastVal = series[lastIdx]
+    const projs = forecast.projections
+
+    // 95% Confidence polygon
+    const upper95 = [`${x(lastIdx).toFixed(1)} ${y(lastVal).toFixed(1)}`]
+    const lower95 = [`${x(lastIdx).toFixed(1)} ${y(lastVal).toFixed(1)}`]
+    const meanPts = [`M ${x(lastIdx).toFixed(1)} ${y(lastVal).toFixed(1)}`]
+
+    projs.forEach((p, idx) => {
+      const stepIdx = lastIdx + 1 + idx
+      const xx = x(stepIdx).toFixed(1)
+      upper95.push(`${xx} ${y(p.ci_95[1]).toFixed(1)}`)
+      lower95.unshift(`${xx} ${y(p.ci_95[0]).toFixed(1)}`)
+      meanPts.push(`L ${xx} ${y(p.projected_tpi).toFixed(1)}`)
+    })
+
+    const poly95 = `M ${upper95.join(' L ')} L ${lower95.join(' L ')} Z`
+
+    return {
+      poly95,
+      meanPath: meanPts.join(' '),
+      lastIdx,
+    }
+  }, [hasForecast, forecast, series, totalPoints, height])
 
   if (!series.length) {
     return (
@@ -71,6 +106,18 @@ export default function Trace({
 
   return (
     <div>
+      {forecast?.available && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+          <button
+            type="button"
+            className="ghost small"
+            style={{ padding: '3px 8px', fontSize: 11 }}
+            onClick={() => setShowForecast(!showForecast)}
+          >
+            {showForecast ? 'Hide trajectory projection' : 'Show trajectory projection (3 sessions)'}
+          </button>
+        </div>
+      )}
       <svg
         viewBox={`0 0 ${W} ${H}`}
         width="100%"
@@ -96,6 +143,8 @@ export default function Trace({
               fill="var(--ink-3)" letterSpacing="1.4">
           OWN BASELINE ±1 SD
         </text>
+
+
 
         {/* y axis */}
         {[30, 40, 50, 60, 70, 80].map((v) => (
@@ -137,7 +186,59 @@ export default function Trace({
                 strokeDasharray="5 4" opacity="0.8" />
         )}
 
-        {/* the trace */}
+        {/* Forecast Fan / Confidence Polygon */}
+        {forecastPaths && (
+          <g>
+            <path
+              d={forecastPaths.poly95}
+              fill="var(--gain-wash)"
+              opacity="0.55"
+            />
+            <path
+              d={forecastPaths.meanPath}
+              fill="none"
+              stroke="var(--gain)"
+              strokeWidth="2"
+              strokeDasharray="4 4"
+            />
+            {forecast.projections.map((p, idx) => {
+              const stepIdx = forecastPaths.lastIdx + 1 + idx
+              return (
+                <g key={`proj-${idx}`}>
+                  <line
+                    x1={x(stepIdx)} x2={x(stepIdx)}
+                    y1={y(p.ci_95[0])} y2={y(p.ci_95[1])}
+                    stroke="var(--gain)" strokeWidth="1" strokeDasharray="2 2" opacity="0.6"
+                  />
+                  <circle
+                    cx={x(stepIdx)}
+                    cy={y(p.projected_tpi)}
+                    r="4"
+                    fill="var(--panel)"
+                    stroke="var(--gain)"
+                    strokeWidth="1.5"
+                  />
+                  <text
+                    x={x(stepIdx)} y={y(p.projected_tpi) - 8}
+                    textAnchor="middle" fontFamily="var(--data)" fontSize="9.5"
+                    fontWeight="600" fill="var(--gain)"
+                  >
+                    ~{p.projected_tpi.toFixed(1)}
+                  </text>
+                  <text
+                    x={x(stepIdx)} y={pad.top + innerH + 18}
+                    textAnchor="middle" fontFamily="var(--data)" fontSize="9"
+                    fill="var(--gain)"
+                  >
+                    +{idx + 1}p
+                  </text>
+                </g>
+              )
+            })}
+          </g>
+        )}
+
+        {/* the actual history trace */}
         <path d={path} fill="none" stroke="var(--ink)" strokeWidth="2.25"
               strokeLinejoin="round" strokeLinecap="round" />
 

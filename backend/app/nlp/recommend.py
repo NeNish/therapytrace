@@ -329,6 +329,337 @@ def next_session_suggestion(
     }
 
 
+
+def _clean_excerpt(text: str | None, max_len: int = 80) -> str:
+    """Clean a client excerpt to read smoothly without cut-offs or prompt artifacts."""
+    if not text:
+        return ""
+    t = text.strip().replace("\n", " ")
+    # Pick the first sentence if multiple
+    for end_punct in [". ", "? ", "! "]:
+        if end_punct in t:
+            t = t.split(end_punct)[0] + end_punct.strip()
+            break
+    if len(t) > max_len:
+        t = t[:max_len].rsplit(" ", 1)[0] + "…"
+    return t
+
+
+def generate_suggested_questions(
+    tpi_series: list[float],
+    features_series: list[dict],
+    dimension_series: dict[str, list[float]],
+    baseline: dict,
+    trajectory: dict | None = None,
+    session_data: dict | None = None,
+) -> dict:
+    """
+    Generate authentic, clinically attuned follow-up questions for the therapist.
+    Rather than robotic formulaic strings or artificial word-frequency snippets,
+    these are framed as warm, conversational inquiries rooted in the client's actual
+    narrative and present moment.
+    """
+    if not tpi_series or not features_series:
+        return {"available": False, "questions": [], "rationale": "Requires at least one completed session."}
+
+    session_idx = len(tpi_series)
+    curr_tpi = tpi_series[-1]
+    last_feats = features_series[-1]
+    prev_tpi = tpi_series[-2] if len(tpi_series) >= 2 else 50.0
+    tpi_delta = curr_tpi - prev_tpi
+
+    session_data = session_data or {}
+    drivers = session_data.get("drivers") or {}
+    weakest_turns = drivers.get("weakest") or []
+    strongest_turns = drivers.get("strongest") or []
+
+    # Get the cleanest meaningful client excerpts from distinct turns
+    excerpt_stuck = _clean_excerpt(weakest_turns[0]["text"] if weakest_turns else None)
+    excerpt_stuck2 = _clean_excerpt(weakest_turns[1]["text"] if len(weakest_turns) > 1 else None)
+    excerpt_gain = _clean_excerpt(strongest_turns[0]["text"] if strongest_turns else None)
+
+    # Read z-scores directly from session_data if provided, or compute against baseline
+    z_scores_dict = session_data.get("z_scores") or {}
+    means = baseline.get("means") or baseline.get("mean") or {}
+    sds = baseline.get("sds") or baseline.get("sd") or {}
+
+    dim_deltas = []
+    for d in DIMENSIONS:
+        if d in z_scores_dict:
+            z = float(z_scores_dict[d])
+            val = last_feats.get(d, 0.0)
+        else:
+            val = last_feats.get(d, 0.0)
+            m = means.get(d, val)
+            s = sds.get(d, 1.0) or 1.0
+            z = (val - m) / s
+        dim_deltas.append((d, z, val))
+
+    dim_deltas.sort(key=lambda x: x[1])
+    lagging_dim, lowest_z, lowest_raw = dim_deltas[0]
+    second_dim, second_z, _ = dim_deltas[1]
+    surging_dim, highest_z, _ = dim_deltas[-1]
+
+    questions: list[dict] = []
+
+    # -------------------------------------------------------------
+    # 1. PRIMARY FOCUS: Grounded in what felt most difficult / constrained
+    # -------------------------------------------------------------
+    if lagging_dim == "self_agency":
+        if excerpt_stuck:
+            q_text = (
+                f"You mentioned last time that {excerpt_stuck.lower().rstrip('.')} — "
+                f"when things start feeling that overwhelming or out of your hands, what is one small thing you can still decide for yourself?"
+            )
+        else:
+            q_text = (
+                "When you find yourself feeling boxed in by situations or other people, "
+                "where do you feel you still have a little room to breathe and make your own choice?"
+            )
+        questions.append({
+            "category": "Exploring Autonomy & Choices",
+            "question": q_text,
+            "clinical_intent": (
+                "Gently explores the client's sense of personal agency without putting pressure on them "
+                f"(Agency z = {lowest_z:+.2f} SD vs baseline)."
+            ),
+            "metric_driver": f"Self-Agency ({lowest_z:+.2f} SD)",
+        })
+
+    # -------------------------------------------------------------
+    # 1. PRIMARY CLINICAL QUESTION: Tailored to what was most constrained/stuck
+    # -------------------------------------------------------------
+    if lagging_dim == "future_orientation":
+        if last_feats.get("rumination", 0) > 0.18:
+            q_text = (
+                f"It sounded like your thoughts were spending a lot of energy replaying past events. "
+                f"If you were to gently look toward the upcoming week, is there one moment you'd like to approach a little differently?"
+            )
+            intent = "Invites the client to step out of retrospective loops into proactive mental rehearsal."
+        elif excerpt_stuck and "numb" in excerpt_stuck.lower():
+            q_text = (
+                f"You spoke about how '{excerpt_stuck.rstrip('.')}' — when feelings start returning, even painful ones, "
+                f"what helps you feel steady enough to stay with them rather than shutting down?"
+            )
+            intent = "Supports emotional tolerance and pacing in grief/avoidance processing."
+        elif excerpt_stuck and ("decision" in excerpt_stuck.lower() or "asking" in excerpt_stuck.lower() or "over me" in excerpt_stuck.lower()):
+            q_text = (
+                f"Thinking back to when '{excerpt_stuck.rstrip('.')}' — in the week ahead, "
+                f"is there a conversation where you'd like to practice naming what you need earlier, before it builds up?"
+            )
+            intent = "Scaffolds forward assertiveness in relational conflict."
+        elif excerpt_stuck and ("reached out" in excerpt_stuck.lower() or "got outside" in excerpt_stuck.lower()):
+            q_text = (
+                f"You mentioned that '{excerpt_stuck.rstrip('.')}' — even if that felt small or exhausting, "
+                f"what is one gentle step you could see yourself taking in the next few days that honors that same effort?"
+            )
+            intent = "Gently builds behavioural activation momentum against depressive fatigue."
+        elif excerpt_stuck:
+            q_text = (
+                f"Reflecting on when you shared that '{excerpt_stuck.rstrip('.')}' — "
+                f"if you imagine a day in the near future where that feels even slightly lighter, what does that day look like?"
+            )
+            intent = "Encourages future horizon imagery to counterbalance stuckness."
+        else:
+            q_text = (
+                "Looking ahead to the coming days, what is one hopeful or practical thing you would like to keep your eyes on?"
+            )
+            intent = "Encourages forward-looking momentum."
+
+        questions.append({
+            "category": "Looking Forward & Anticipation",
+            "question": q_text,
+            "clinical_intent": intent,
+            "metric_driver": f"Future Horizon ({lowest_z:+.2f} SD)",
+        })
+
+    elif lagging_dim == "self_agency":
+        if excerpt_stuck:
+            q_text = (
+                f"When you reflected that '{excerpt_stuck.rstrip('.')}', it sounded like a situation where you felt quite constrained. "
+                f"Looking back at that moment, what is one small boundary or response that could still belong purely to you?"
+            )
+        else:
+            q_text = (
+                "When you find yourself feeling boxed in by situations or other people, "
+                "where do you feel you still have a little room to breathe and make your own choice?"
+            )
+        questions.append({
+            "category": "Exploring Autonomy & Choices",
+            "question": q_text,
+            "clinical_intent": (
+                "Gently explores the client's sense of personal agency without putting pressure on them "
+                f"(Agency z = {lowest_z:+.2f} SD vs baseline)."
+            ),
+            "metric_driver": f"Self-Agency ({lowest_z:+.2f} SD)",
+        })
+
+    elif lagging_dim == "problem_ownership":
+        if excerpt_stuck:
+            q_text = (
+                f"When describing how '{excerpt_stuck.rstrip('.')}' — "
+                f"in dynamics like that, what feels like your responsibility to carry, and what feels like it belongs to someone else?"
+            )
+        else:
+            q_text = (
+                "When difficulties arise, what part of the situation feels like it's within your power to influence, "
+                "and what parts do you need permission to let go of?"
+            )
+        questions.append({
+            "category": "Clarifying Boundaries & Responsibility",
+            "question": q_text,
+            "clinical_intent": (
+                "Helps differentiate healthy responsibility from external helplessness or inappropriate self-blame "
+                f"(Problem Ownership z = {lowest_z:+.2f} SD)."
+            ),
+            "metric_driver": f"Problem Ownership ({lowest_z:+.2f} SD)",
+        })
+
+    elif lagging_dim == "emotional_granularity":
+        if excerpt_stuck:
+            q_text = (
+                f"When you described feeling that way — '{excerpt_stuck.rstrip('.')}' — "
+                f"if you were to pause and really check in with your body, what feelings were sitting right beneath the surface?"
+            )
+        else:
+            q_text = (
+                "When that heavy or uneasy feeling shows up, what specific emotions do you notice coming along with it — "
+                "is it frustration, exhaustion, fear, or something else?"
+            )
+        questions.append({
+            "category": "Untangling Underlying Emotions",
+            "question": q_text,
+            "clinical_intent": (
+                "Helps the client develop richer emotional vocabulary rather than staying in diffuse distress "
+                f"(Emotional Granularity z = {lowest_z:+.2f} SD)."
+            ),
+            "metric_driver": f"Emotional Granularity ({lowest_z:+.2f} SD)",
+        })
+
+    elif lagging_dim == "reflection_depth":
+        if excerpt_stuck:
+            q_text = (
+                f"Looking back at when you noticed that '{excerpt_stuck.rstrip('.')}' — "
+                f"what do you think that moment was trying to tell you about what you genuinely needed?"
+            )
+        else:
+            q_text = (
+                "Stepping back from the busy sequence of what happened this week, "
+                "what pattern or recurring feeling stands out most clearly to you?"
+            )
+        questions.append({
+            "category": "Deepening Insight & Meaning",
+            "question": q_text,
+            "clinical_intent": (
+                "Invites psychological reflection beyond storytelling to uncover underlying patterns "
+                f"(Reflection Depth z = {lowest_z:+.2f} SD)."
+            ),
+            "metric_driver": f"Reflection Depth ({lowest_z:+.2f} SD)",
+        })
+
+    # -------------------------------------------------------------
+    # 2. SECONDARY / COMPLEMENTARY CLINICAL INQUIRY
+    # -------------------------------------------------------------
+    if second_dim == "problem_ownership":
+        q2 = (
+            "When navigating stress this week, what helped you decide which problems were genuinely yours to solve "
+            "versus things outside your control?"
+        )
+        cat2 = "Discerning Personal Influence"
+        intent2 = "Encourages healthy boundary discernment and realistic locus of control."
+    elif second_dim == "reflection_depth":
+        q2 = (
+            "When you stepped back from the daily rush between our sessions, "
+            "what realization or pattern about yourself came into view most clearly?"
+        )
+        cat2 = "Reflective Pattern Recognition"
+        intent2 = "Fosters self-observing capacity and internal psychological attunement."
+    elif second_dim == "emotional_granularity":
+        q2 = (
+            "When you felt most unsettled this past week, what was the physical sensation or mood that you carried most strongly?"
+        )
+        cat2 = "Emotional Awareness & Grounding"
+        intent2 = "Encourages the client to name somatic and affective states with greater nuance."
+    elif second_dim == "self_agency":
+        q2 = (
+            "In moments where the week felt chaotic, were there any quiet boundaries or small choices that helped you stay anchored?"
+        )
+        cat2 = "Recognizing Inner Strengths"
+        intent2 = "Reinforces client autonomy and small self-protective boundaries."
+    else:
+        q2 = (
+            "Outside of the immediate difficulties we've been working through, "
+            "is there something in the coming week you're quietly hoping goes well?"
+        )
+        cat2 = "Fostering Tomorrow's Hopes"
+        intent2 = "Provides balance by inquiring about forward anticipation and everyday resilience."
+
+    questions.append({
+        "category": cat2,
+        "question": q2,
+        "clinical_intent": intent2,
+        "metric_driver": f"Complementary Focus ({second_dim.replace('_', ' ').title()})",
+    })
+
+    # -------------------------------------------------------------
+    # 3. CONTEXTUAL SIGNAL (Velocity Shift, Rupture Check, or Breakthrough Anchor)
+    # -------------------------------------------------------------
+    if tpi_delta <= -6.0:
+        questions.append({
+            "category": "Checking In on the Relationship",
+            "question": (
+                "Before we jump into new things today, I wanted to pause and check in: "
+                "how did our last session sit with you after you left? Did anything feel rushed or misunderstood?"
+            ),
+            "clinical_intent": (
+                f"Addresses an observed drop in session momentum ({tpi_delta:+.1f} pts) through supportive metacommunication."
+            ),
+            "metric_driver": f"Momentum Shift ({tpi_delta:+.1f} pts)",
+        })
+    elif tpi_delta >= 7.0 or curr_tpi >= 60.0:
+        questions.append({
+            "category": "Consolidating Breakthrough Moments",
+            "question": (
+                "You expressed a great deal of clarity and openness in our last session. "
+                "What allowed you to tap into that strength, and how has that felt in your day-to-day life since?"
+            ),
+            "clinical_intent": (
+                f"Helps anchor the client's recent positive breakthrough (+{tpi_delta:.1f} pts gain) into lasting self-concept."
+            ),
+            "metric_driver": f"Positive Shift (+{tpi_delta:.1f} pts)",
+        })
+    elif last_feats.get("hopelessness", 0) > 0.25:
+        questions.append({
+            "category": "Nurturing Resilience in Low Moments",
+            "question": (
+                "When that familiar feeling tells you that things won't change, "
+                "what is the quiet part of you that still chooses to show up and give therapy a chance?"
+            ),
+            "clinical_intent": "Gently explores the client's innate resilience and underlying values during discouraging phases.",
+            "metric_driver": "Presence of Depressive Strain",
+        })
+
+    # Ensure 2 to 3 high-quality questions
+    selected_questions = questions[:3]
+
+    rationale = (
+        f"Prepared for Session {session_idx}: focused on supportive exploration of {lagging_dim.replace('_', ' ')} "
+        f"and the client's current emotional state, framed in natural clinical language."
+    )
+
+    return {
+        "available": True,
+        "session_number": session_idx,
+        "target_dimension": lagging_dim,
+        "target_z": round(lowest_z, 2),
+        "tpi": curr_tpi,
+        "tpi_delta": round(tpi_delta, 1),
+        "questions": selected_questions,
+        "clinical_rationale": rationale,
+    }
+
+
+
 # --------------------------------------------------------------------------
 
 def recommend(
@@ -338,13 +669,17 @@ def recommend(
     baseline: dict,
     trajectory: dict | None = None,
     profile: dict | None = None,
+    session_data: dict | None = None,
 ) -> dict:
-    """Everything M17 produces for one client."""
+    """Everything M17 produces for one client, strictly based on recent data."""
     resp = (profile or {}).get("response")
     return {
         "targeting": target_dimensions(dimension_series, baseline),
         "early_warning": early_warning(tpi_series, features_series, trajectory),
         "next_session": next_session_suggestion(tpi_series, resp),
+        "suggested_questions": generate_suggested_questions(
+            tpi_series, features_series, dimension_series, baseline, trajectory, session_data
+        ),
         "principle": (
             "Decision support for reflection and supervision. The system "
             "suggests what to consider and shows its reasoning; the clinical "

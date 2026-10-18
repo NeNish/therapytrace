@@ -68,7 +68,7 @@ export default function SessionView() {
           shown at all: at macro-F1 0.49 roughly one in two is wrong, and a
           coloured transcript would present that noise as fact. ------------- */}
       {(() => {
-        const talk = data.ml && data.ml.client_talk
+        const talk = s?.ml && s.ml.client_talk
         if (!talk || talk.change_talk_ratio === null || talk.change_talk_ratio === undefined) {
           return null
         }
@@ -214,6 +214,60 @@ export default function SessionView() {
           </p>
         )}
       </div>
+
+      {/* ---------------- suggested questions (only available on the most recent session) ---------------- */}
+      {s.suggested_questions?.available && (
+        <div className="panel">
+          <div className="topline" style={{ background: 'var(--mark)' }} />
+          <div className="panel-head">
+            <div>
+              <h2>Suggested Follow-Up Questions (Session {s.session_number} &rarr; Session {s.session_number + 1})</h2>
+              <p className="small muted" style={{ margin: 0 }}>
+                Synthesized dynamically from the linguistic features, driver turns, and state trajectory of this most recent session.
+              </p>
+            </div>
+            <span className="state-tag" style={{ color: 'var(--mark)', background: 'var(--mark-wash)', whiteSpace: 'nowrap' }}>
+              Targeting: {s.suggested_questions.target_dimension?.replace(/_/g, ' ')} ({s.suggested_questions.target_z > 0 ? '+' : ''}{s.suggested_questions.target_z} SD)
+            </span>
+          </div>
+          <p className="small" style={{ margin: '8px 0 16px', color: 'var(--ink-2)' }}>
+            {s.suggested_questions.clinical_rationale}
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {s.suggested_questions.questions?.map((q, idx) => (
+              <div key={idx} style={{
+                background: '#fff',
+                border: '1px solid var(--rule)',
+                borderLeft: '4px solid var(--mark)',
+                padding: '14px 18px',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <span className="eyebrow" style={{ color: 'var(--ink)', margin: 0, fontWeight: 600 }}>
+                    {q.category}
+                  </span>
+                  {q.metric_driver && (
+                    <span className="mono small" style={{
+                      background: 'var(--mark-wash)',
+                      color: 'var(--mark)',
+                      padding: '2px 7px',
+                      border: '1px solid var(--mark)',
+                      fontSize: 11,
+                    }}>
+                      Trigger: {q.metric_driver}
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontFamily: 'var(--body)', fontSize: 16, fontWeight: 500, color: 'var(--ink)', marginBottom: 8, lineHeight: 1.5 }}>
+                  "{q.question}"
+                </div>
+                <div className="small muted" style={{ borderTop: '1px solid var(--rule-soft)', paddingTop: 6 }}>
+                  <strong>Clinical Rationale:</strong> {q.clinical_intent}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {s.parse_info?.multimodal?.insights && (
         <div className="panel">

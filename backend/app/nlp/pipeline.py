@@ -159,7 +159,8 @@ def rollup_client(session_rows: list[dict], turn_records: list[dict] | None = No
         "trajectory": traj,
         "profile": profile,
         "recommendation": recommend(
-            tpi_series, features_series, dim_series, base.to_dict(), traj, profile
+            tpi_series, features_series, dim_series, base.to_dict(), traj, profile,
+            session_data=rescored[-1] if rescored else None,
         ),
         "narrative": session_note(
             {"score": {"tpi": tpi_series[-1],

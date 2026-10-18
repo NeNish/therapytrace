@@ -148,6 +148,7 @@ def client_trajectory(db: DbSession, client: Client) -> dict:
             # Without it the supervised layer stops at the database, which is
             # exactly where it used to stop.
             "ml": s.analysis.ml or {},
+            "drivers": s.analysis.drivers or {},
         }
         for s in ordered
     ]

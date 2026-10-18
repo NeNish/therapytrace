@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import { FrameCard, FrameImg, PreviewGallery, SupervisionList } from '../components/FramePreview'
+import LiveRecorder from '../components/LiveRecorder'
 import { api, DIMENSION_LABELS } from '../lib/api'
 
 const SAMPLE = `THERAPIST: How has the week been?
@@ -157,6 +158,7 @@ export default function Multimodal() {
   const [audioInfo, setAudioInfo] = useState(null)
   const [videoInfo, setVideoInfo] = useState(null)
   const [uploading, setUploading] = useState(null)
+  const [recorderMode, setRecorderMode] = useState(null) // null | 'audio' | 'video'
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
 
@@ -230,6 +232,28 @@ export default function Multimodal() {
         </div>
       </div>
 
+      {recorderMode && (
+        <div style={{ marginBottom: 20 }}>
+          <div className="panel-head" style={{ marginBottom: 8 }}>
+            <h3>Live In-Browser Capture ({recorderMode === 'video' ? 'Video & Audio' : 'Audio'})</h3>
+            <button type="button" className="btn ghost small" onClick={() => setRecorderMode(null)}>
+              Close Recorder ✕
+            </button>
+          </div>
+          <LiveRecorder
+            defaultMode={recorderMode === 'video' ? 'video' : 'audio'}
+            showTranscript={includeText}
+            initialTranscript={transcript}
+            onComplete={({ transcript: recTr, audioPath: aP, videoPath: vP, mediaInfo }) => {
+              if (recTr) setTranscript(recTr)
+              if (aP) { setAudioPath(aP); setAudioInfo(mediaInfo) }
+              if (vP) { setVideoPath(vP); setVideoInfo(mediaInfo) }
+              setRecorderMode(null)
+            }}
+          />
+        </div>
+      )}
+
       <div className="grid-3">
         <Channel tag="CHANNEL 1" title="Text" primary={includeText} active={!!ch.text?.available}
                  role="Language process markers — strongest validated signal.">
@@ -254,6 +278,14 @@ export default function Multimodal() {
           </label>
           <input id="af" type="file" accept="audio/*,.wav,.mp3,.m4a" className="sr-only"
                  onChange={(e) => upload(e.target.files?.[0], 'audio')} />
+          <button
+            type="button"
+            className="btn ghost small"
+            style={{ cursor: 'pointer', display: 'block', width: '100%', marginTop: 8 }}
+            onClick={() => setRecorderMode('audio')}
+          >
+            🎙️ Record Audio Live
+          </button>
           {audioInfo && (
             <>
               <p className="mono small" style={{ marginTop: 8, color: 'var(--gain)' }}>
@@ -262,7 +294,7 @@ export default function Multimodal() {
               <button type="button" className="btn ghost small" onClick={() => clearChannel('audio')}>Remove</button>
             </>
           )}
-          <p className="small muted" style={{ marginTop: 8 }}>.wav, .mp3 or .m4a</p>
+          <p className="small muted" style={{ marginTop: 8 }}>.wav, .mp3, .m4a or live mic</p>
         </Channel>
 
         <Channel tag="CHANNEL 3" title="Video" active={!!ch.video?.available}
@@ -273,6 +305,14 @@ export default function Multimodal() {
           </label>
           <input id="vf" type="file" accept="video/*,.mp4,.mov,.m4v" className="sr-only"
                  onChange={(e) => upload(e.target.files?.[0], 'video')} />
+          <button
+            type="button"
+            className="btn ghost small"
+            style={{ cursor: 'pointer', display: 'block', width: '100%', marginTop: 8 }}
+            onClick={() => setRecorderMode('video')}
+          >
+            📹 Record Video Live
+          </button>
           {videoInfo && (
             <>
               <p className="mono small" style={{ marginTop: 8, color: 'var(--gain)' }}>
@@ -283,7 +323,7 @@ export default function Multimodal() {
               <button type="button" className="btn ghost small" onClick={() => clearChannel('video')}>Remove</button>
             </>
           )}
-          <p className="small muted" style={{ marginTop: 8 }}>.mp4 or .mov — first 60 seconds analysed</p>
+          <p className="small muted" style={{ marginTop: 8 }}>.mp4, .mov or live camera</p>
         </Channel>
       </div>
 

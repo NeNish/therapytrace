@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import ChangeTalk from '../components/ChangeTalk'
 import DimensionGrid from '../components/DimensionGrid'
+import LiveRecorder from '../components/LiveRecorder'
 import Trace from '../components/Trace'
 import { api, DIMENSION_LABELS, STATE_COPY, stateColor } from '../lib/api'
 
@@ -20,6 +21,7 @@ export default function CaseTrace() {
   const [audioInfo, setAudioInfo] = useState(null)
   const [videoInfo, setVideoInfo] = useState(null)
   const [uploading, setUploading] = useState(null)
+  const [sessionInputTab, setSessionInputTab] = useState('upload') // 'upload' | 'record'
   const fileRef = useRef(null)
 
   const load = useCallback(
@@ -152,6 +154,8 @@ export default function CaseTrace() {
           series={tpi_series}
           changePoint={cp}
           measures={measures}
+          forecast={trajectory?.forecast}
+          rci={trajectory?.rci}
           selected={selected}
           onSelect={(i) => setSelected(i)}
         />
@@ -184,8 +188,16 @@ export default function CaseTrace() {
             <div className="v">{trajectory.n_sessions}</div>
           </div>
           <div className="readout-item">
-            <div className="k">Volatility (SD)</div>
-            <div className="v">{momentum?.volatility ?? '—'}</div>
+            <div className="k">Linguistic Momentum</div>
+            <div className="v" style={{
+              fontSize: 18,
+              color: momentum?.state === 'improving' ? 'var(--gain)' :
+                     momentum?.state === 'regressing' ? 'var(--regress)' : 'var(--hold)',
+            }}>
+              {momentum?.state === 'improving' ? 'Accelerating ↗' :
+               momentum?.state === 'regressing' ? 'Decelerating ↘' :
+               momentum?.state === 'plateauing' ? 'Steady →' : 'Gaining ↑'}
+            </div>
           </div>
         </div>
 
@@ -202,6 +214,253 @@ export default function CaseTrace() {
           </p>
         )}
       </div>
+
+      {/* ---------------- Session DNA & Turning Point Detector ---------------- */}
+      <div className="grid-2">
+        {/* Session DNA Pentagram (Latest vs Baseline) */}
+        <div className="panel">
+          <div className="topline" style={{ background: 'var(--ink)' }} />
+          <div className="panel-head">
+            <div>
+              <h2>Session DNA (5 Dimensions)</h2>
+              <p className="small muted" style={{ margin: 0 }}>
+                Visual footprint of the latest session (teal) against baseline norm (dashed black).
+              </p>
+            </div>
+            <span className="state-tag" style={{ background: 'var(--panel)', border: '1px solid var(--rule)' }}>
+              Latest: Session {sessions.length}
+            </span>
+          </div>
+          {(() => {
+            const dims = ['self_agency', 'future_orientation', 'emotional_granularity', 'problem_ownership', 'reflection_depth']
+            const labels = ['Agency', 'Future', 'Granularity', 'Ownership', 'Reflection']
+            const latestSess = sessions[sessions.length - 1]
+            const zScores = latestSess?.z_scores || {}
+
+            const size = 220
+            const center = size / 2
+            const radius = 70
+
+            // Helper to get polar coordinates for a pentagon
+            const getPoint = (valZ, index) => {
+              // Clamp z between -2.5 and +2.5, map to fraction 0.1 to 1.0
+              const clamped = Math.max(-2.5, Math.min(2.5, valZ || 0))
+              const r = radius * (0.55 + (clamped / 2.5) * 0.45)
+              const angle = (index * 2 * Math.PI) / 5 - Math.PI / 2
+              return {
+                x: center + r * Math.cos(angle),
+                y: center + r * Math.sin(angle),
+              }
+            }
+
+            const getBasePoint = (index) => {
+              const r = radius * 0.55 // z = 0 baseline
+              const angle = (index * 2 * Math.PI) / 5 - Math.PI / 2
+              return {
+                x: center + r * Math.cos(angle),
+                y: center + r * Math.sin(angle),
+              }
+            }
+
+            const currentPts = dims.map((d, i) => getPoint(zScores[d] ?? 0, i))
+            const currentPath = currentPts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ') + ' Z'
+
+            const basePts = dims.map((_, i) => getBasePoint(i))
+            const basePath = basePts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ') + ' Z'
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 10 }}>
+                <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+                  {/* Background concentric rings */}
+                  {[0.25, 0.55, 0.85, 1.0].map((frac, idx) => (
+                    <polygon
+                      key={idx}
+                      points={dims.map((_, i) => {
+                        const a = (i * 2 * Math.PI) / 5 - Math.PI / 2
+                        const rx = center + radius * frac * Math.cos(a)
+                        const ry = center + radius * frac * Math.sin(a)
+                        return `${rx.toFixed(1)},${ry.toFixed(1)}`
+                      }).join(' ')}
+                      fill="none"
+                      stroke="var(--rule)"
+                      strokeWidth={idx === 1 ? '1.5' : '0.8'}
+                      strokeDasharray={idx === 1 ? '3 3' : 'none'}
+                    />
+                  ))}
+
+                  {/* Spokes */}
+                  {dims.map((_, i) => {
+                    const a = (i * 2 * Math.PI) / 5 - Math.PI / 2
+                    return (
+                      <line
+                        key={i}
+                        x1={center} y1={center}
+                        x2={center + radius * Math.cos(a)}
+                        y2={center + radius * Math.sin(a)}
+                        stroke="var(--rule)"
+                        strokeWidth="1"
+                      />
+                    )
+                  })}
+
+                  {/* Baseline Shape */}
+                  <path d={basePath} fill="none" stroke="var(--ink-3)" strokeWidth="1.2" strokeDasharray="3 3" />
+
+                  {/* Client Current Shape */}
+                  <path d={currentPath} fill="var(--gain-wash)" stroke="var(--gain)" strokeWidth="2" opacity="0.85" />
+
+                  {/* Vertices & Labels */}
+                  {dims.map((d, i) => {
+                    const p = currentPts[i]
+                    const a = (i * 2 * Math.PI) / 5 - Math.PI / 2
+                    const lx = center + (radius + 20) * Math.cos(a)
+                    const ly = center + (radius + 20) * Math.sin(a) + 3
+                    const z = zScores[d] ?? 0
+                    return (
+                      <g key={d}>
+                        <circle cx={p.x} cy={p.y} r="3.5" fill="var(--panel)" stroke="var(--gain)" strokeWidth="2" />
+                        <text
+                          x={lx} y={ly}
+                          textAnchor="middle"
+                          fontFamily="var(--data)"
+                          fontSize="9"
+                          fill="var(--ink)"
+                          fontWeight="600"
+                        >
+                          {labels[i]} ({z >= 0 ? '+' : ''}{z.toFixed(1)})
+                        </text>
+                      </g>
+                    )
+                  })}
+                </svg>
+
+                <div className="small muted" style={{ textAlign: 'center', marginTop: 8 }}>
+                  Solid green is this session's contour; dashed circle is the client's own baseline.
+                </div>
+              </div>
+            )
+          })()}
+        </div>
+
+        {/* Turning Point Detector */}
+        <div className="panel">
+          <div className="topline" style={{ background: 'var(--mark)' }} />
+          <div className="panel-head">
+            <div>
+              <h2>Turning Point Detector</h2>
+              <p className="small muted" style={{ margin: 0 }}>
+                Single session with the largest upward momentum jump across the full timeline.
+              </p>
+            </div>
+            <span className="state-tag" style={{ background: 'var(--mark-wash)', color: 'var(--mark)' }}>
+              Milestone Shift
+            </span>
+          </div>
+
+          {(() => {
+            if (sessions.length < 2) {
+              return <p className="small muted" style={{ marginTop: 14 }}>Requires at least 2 sessions to detect velocity shifts.</p>
+            }
+
+            let maxDelta = -Infinity
+            let turningIdx = -1
+            for (let i = 1; i < sessions.length; i++) {
+              const delta = sessions[i].tpi - sessions[i - 1].tpi
+              if (delta > maxDelta) {
+                maxDelta = delta
+                turningIdx = i
+              }
+            }
+
+            const turningSess = sessions[turningIdx]
+            const prevSess = sessions[turningIdx - 1]
+
+            return (
+              <div style={{ marginTop: 12 }}>
+                <div className="readout" style={{ gap: 16 }}>
+                  <div className="readout-item">
+                    <div className="k">Turning Point</div>
+                    <div className="v" style={{ fontSize: 20 }}>Session {turningSess.session_number}</div>
+                  </div>
+                  <div className="readout-item">
+                    <div className="k">Max Single Jump</div>
+                    <div className="v" style={{ fontSize: 20, color: maxDelta > 0 ? 'var(--gain)' : 'var(--regress)' }}>
+                      {maxDelta > 0 ? '+' : ''}{maxDelta.toFixed(1)} pts
+                    </div>
+                  </div>
+                  <div className="readout-item">
+                    <div className="k">Shift Range</div>
+                    <div className="v" style={{ fontSize: 20 }}>
+                      {prevSess.tpi.toFixed(1)} &rarr; {turningSess.tpi.toFixed(1)}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 14, padding: '10px 14px', background: 'var(--panel)', border: '1px solid var(--rule)' }}>
+                  <div className="eyebrow" style={{ color: 'var(--mark)', marginBottom: 4 }}>
+                    Leading Factor in Session {turningSess.session_number}
+                  </div>
+                  <p className="small" style={{ margin: 0, lineHeight: 1.5 }}>
+                    {(() => {
+                      const zEntries = Object.entries(turningSess.z_scores || {})
+                      zEntries.sort((a, b) => b[1] - a[1])
+                      if (zEntries.length > 0) {
+                        const [bestDim, bestZ] = zEntries[0]
+                        return `The jump was led by a surge in ${bestDim.replace(/_/g, ' ')} (+${bestZ.toFixed(2)} SD), signaling an inflection in client autonomy and psychological movement.`
+                      }
+                      return `Score elevated significantly from Session ${prevSess.session_number} to Session ${turningSess.session_number}.`
+                    })()}
+                  </p>
+                </div>
+
+                <div className="row" style={{ marginTop: 12 }}>
+                  <Link className="btn ghost small" to={`/session/${turningSess.id}`}>
+                    Examine Turning Session {turningSess.session_number} &rarr;
+                  </Link>
+                </div>
+              </div>
+            )
+          })()}
+        </div>
+      </div>
+
+      {/* Trajectory Forecast Details */}
+      {trajectory?.forecast?.available && trajectory.forecast.projections?.length > 0 && (
+        <div className="panel">
+          <div className="topline" style={{ background: 'var(--gain)' }} />
+          <div className="panel-head">
+            <h2>Bayesian-Damped Trajectory Projection (Next 3 Sessions)</h2>
+            <span className="state-tag state-gaining">Forward Outlook</span>
+          </div>
+          <p className="small" style={{ marginTop: -4 }}>
+            {trajectory.forecast.outlook} Modeled via damped auto-regressive momentum with expanding 80% and 95% confidence bands to safeguard against runaway forecasts.
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Projected Session</th>
+                <th className="num">Expected TPI</th>
+                <th className="num">Expected Δ vs Today</th>
+                <th className="num">80% Credible Interval</th>
+                <th className="num">95% Credible Interval</th>
+              </tr>
+            </thead>
+            <tbody>
+              {trajectory.forecast.projections.map((p) => (
+                <tr key={p.session_number}>
+                  <td className="mono">Session {p.session_number} (projected)</td>
+                  <td className="num"><strong>{p.projected_tpi.toFixed(1)}</strong></td>
+                  <td className="num" style={{ color: p.expected_change >= 0 ? 'var(--gain)' : 'var(--regress)' }}>
+                    {p.expected_change > 0 ? '+' : ''}{p.expected_change.toFixed(1)}
+                  </td>
+                  <td className="num mono small muted">[{p.ci_80[0]} – {p.ci_80[1]}]</td>
+                  <td className="num mono small muted">[{p.ci_95[0]} – {p.ci_95[1]}]</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* ---------------- dimensions ---------------- */}
       <h2 style={{ marginTop: 30 }}>What moved</h2>
@@ -338,54 +597,97 @@ export default function CaseTrace() {
       </div>
 
       <div className="grid-2">
-        <form className="panel" onSubmit={addSession}>
-          <h2>Add a session</h2>
-          <p className="small muted" style={{ marginTop: -6 }}>
-            Paste a speaker-labelled transcript. Optionally attach audio and/or
-            video from the same session for posture and vocal insights.
-            Sessions under 300 client words score with reduced confidence.
-          </p>
-          <div className="field">
-            <label htmlFor="tr">Transcript</label>
-            <textarea
-              id="tr" rows={7} value={transcript}
-              placeholder={'THERAPIST: How has the week been?\nCLIENT: ...'}
-              onChange={(e) => setTranscript(e.target.value)}
-            />
-          </div>
-          <div className="grid-2" style={{ gap: 10, marginBottom: 12 }}>
-            <div>
-              <label htmlFor="sess-audio" className="btn ghost small"
-                     style={{ cursor: 'pointer', display: 'block', textAlign: 'center' }}>
-                {uploading === 'audio' ? 'Uploading…' : 'Attach audio (optional)'}
-              </label>
-              <input id="sess-audio" type="file" accept="audio/*,.wav,.mp3,.m4a" className="sr-only"
-                     onChange={(e) => uploadMedia(e.target.files?.[0], 'audio')} />
-              {audioInfo && (
-                <p className="mono small muted" style={{ marginTop: 4 }}>{audioInfo.filename}</p>
-              )}
-            </div>
-            <div>
-              <label htmlFor="sess-video" className="btn ghost small"
-                     style={{ cursor: 'pointer', display: 'block', textAlign: 'center' }}>
-                {uploading === 'video' ? 'Uploading…' : 'Attach video (optional)'}
-              </label>
-              <input id="sess-video" type="file" accept="video/*,.mp4,.mov,.m4v" className="sr-only"
-                     onChange={(e) => uploadMedia(e.target.files?.[0], 'video')} />
-              {videoInfo && (
-                <p className="mono small muted" style={{ marginTop: 4 }}>{videoInfo.filename}</p>
-              )}
+        <div className="panel">
+          <div className="panel-head" style={{ marginBottom: 10 }}>
+            <h2>Add a session</h2>
+            <div className="mode-toggle-group">
+              <button
+                type="button"
+                className={`mode-btn ${sessionInputTab === 'upload' ? 'active' : ''}`}
+                onClick={() => setSessionInputTab('upload')}
+              >
+                📝 Paste / File
+              </button>
+              <button
+                type="button"
+                className={`mode-btn ${sessionInputTab === 'record' ? 'active' : ''}`}
+                onClick={() => setSessionInputTab('record')}
+              >
+                🎙️ Record Live
+              </button>
             </div>
           </div>
-          <div className="row">
-            <button type="submit" disabled={busy}>{busy ? 'Scoring…' : 'Score session'}</button>
-            <label htmlFor="file" className="btn ghost" style={{ cursor: 'pointer', textTransform: 'none', letterSpacing: 0, fontSize: 13 }}>
-              Upload a .txt file
-            </label>
-            <input id="file" ref={fileRef} type="file" accept=".txt,.md,.csv"
-                   onChange={uploadFile} className="sr-only" />
-          </div>
-        </form>
+
+          {sessionInputTab === 'record' ? (
+            <div>
+              <p className="small muted" style={{ marginTop: -4, marginBottom: 12 }}>
+                Record live audio, video, and spoken dialogue. Spoken words will automatically transcribe into speaker-labelled turns.
+              </p>
+              <LiveRecorder
+                defaultMode="dictation"
+                initialTranscript={transcript}
+                onComplete={({ transcript: recTr, audioPath: aP, videoPath: vP, mediaInfo }) => {
+                  if (recTr) setTranscript(recTr)
+                  if (aP) { setAudioPath(aP); setAudioInfo(mediaInfo) }
+                  if (vP) { setVideoPath(vP); setVideoInfo(mediaInfo) }
+                  setSessionInputTab('upload')
+                }}
+              />
+            </div>
+          ) : (
+            <form onSubmit={addSession}>
+              <p className="small muted" style={{ marginTop: -4 }}>
+                Paste a speaker-labelled transcript. Optionally attach audio and/or
+                video from the same session for posture and vocal insights.
+                Sessions under 300 client words score with reduced confidence.
+              </p>
+              <div className="field">
+                <label htmlFor="tr">Transcript</label>
+                <textarea
+                  id="tr" rows={7} value={transcript}
+                  placeholder={'THERAPIST: How has the week been?\nCLIENT: ...'}
+                  onChange={(e) => setTranscript(e.target.value)}
+                />
+              </div>
+              <div className="grid-2" style={{ gap: 10, marginBottom: 12 }}>
+                <div>
+                  <label htmlFor="sess-audio" className="btn ghost small"
+                         style={{ cursor: 'pointer', display: 'block', textAlign: 'center' }}>
+                    {uploading === 'audio' ? 'Uploading…' : audioPath ? '✓ Audio attached' : 'Attach audio (optional)'}
+                  </label>
+                  <input id="sess-audio" type="file" accept="audio/*,.wav,.mp3,.m4a" className="sr-only"
+                         onChange={(e) => uploadMedia(e.target.files?.[0], 'audio')} />
+                  {audioInfo && (
+                    <p className="mono small" style={{ marginTop: 4, color: 'var(--gain)' }}>
+                      {audioInfo.filename} ({audioInfo.size_mb} MB)
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label htmlFor="sess-video" className="btn ghost small"
+                         style={{ cursor: 'pointer', display: 'block', textAlign: 'center' }}>
+                    {uploading === 'video' ? 'Uploading…' : videoPath ? '✓ Video attached' : 'Attach video (optional)'}
+                  </label>
+                  <input id="sess-video" type="file" accept="video/*,.mp4,.mov,.m4v" className="sr-only"
+                         onChange={(e) => uploadMedia(e.target.files?.[0], 'video')} />
+                  {videoInfo && (
+                    <p className="mono small" style={{ marginTop: 4, color: 'var(--gain)' }}>
+                      {videoInfo.filename} ({videoInfo.size_mb} MB)
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="row">
+                <button type="submit" disabled={busy}>{busy ? 'Scoring…' : 'Score session'}</button>
+                <label htmlFor="file" className="btn ghost" style={{ cursor: 'pointer', textTransform: 'none', letterSpacing: 0, fontSize: 13 }}>
+                  Upload a .txt file
+                </label>
+                <input id="file" ref={fileRef} type="file" accept=".txt,.md,.csv"
+                       onChange={uploadFile} className="sr-only" />
+              </div>
+            </form>
+          )}
+        </div>
 
         <form className="panel" onSubmit={addMeasure}>
           <h2>Record a self-report score</h2>
@@ -415,7 +717,8 @@ export default function CaseTrace() {
       </div>
 
       <div className="row" style={{ marginTop: 8 }}>
-        <Link className="btn" to={`/case/${id}/insights`}>Insights & recommendation →</Link>
+        <Link className="btn" to={`/case/${id}/insights`}>Insights & Questions →</Link>
+        <Link className="btn ghost" to={`/case/${id}/compare`}>Compare Sessions (Diff) →</Link>
         <Link className="btn ghost" to={`/case/${id}/therapist`}>Therapist contribution →</Link>
       </div>
     </>

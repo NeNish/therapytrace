@@ -173,6 +173,206 @@ def streaks(y: list[float], reference: float = 50.0) -> dict:
 RECENT_WINDOW = 6
 
 
+def calculate_rci(
+    tpi_series: list[float],
+    baseline_sd: float = 10.0,
+    reliability: float = 0.82,
+) -> dict:
+    """
+    Jacobson & Truax (1991) Reliable Change Index (RCI).
+    Standard Error of Measurement: S_diff = sqrt(2 * (SE_meas)^2) = sqrt(2 * (SD * sqrt(1 - r_xx))^2)
+    For TPI with scaled personal baseline SD ~ 10 and test-retest reliability r_xx ~ 0.82:
+    S_diff = sqrt(2 * 100 * 0.18) = sqrt(36) = 6.0 points.
+    A change |Δ| >= 1.96 * S_diff (approx 11.76 points) is statistically reliable at p < 0.05.
+    """
+    if len(tpi_series) < 2:
+        return {
+            "available": False,
+            "reliable_change_threshold": 11.76,
+            "status": "baseline_only",
+            "net_change": 0.0,
+            "rci_score": 0.0,
+            "clinical_significance": "Insufficient sessions to calculate reliable change.",
+        }
+
+    s_diff = math.sqrt(2.0 * (baseline_sd ** 2) * (1.0 - reliability))
+    net_change = tpi_series[-1] - tpi_series[0]
+    rci_stat = net_change / s_diff if s_diff else 0.0
+    crit = 1.96
+
+    if rci_stat >= crit:
+        status = "reliable_improvement"
+        desc = (
+            f"Client shows statistically reliable improvement (RCI = +{rci_stat:.2f}, p < 0.05). "
+            f"Net gain of +{net_change:.1f} exceeds measurement error (threshold ±{crit * s_diff:.1f} pts)."
+        )
+    elif rci_stat <= -crit:
+        status = "reliable_deterioration"
+        desc = (
+            f"Client shows statistically reliable deterioration (RCI = {rci_stat:.2f}, p < 0.05). "
+            f"Net loss of {net_change:.1f} exceeds measurement error (threshold ±{crit * s_diff:.1f} pts)."
+        )
+    else:
+        status = "no_reliable_change"
+        desc = (
+            f"Change of {net_change:+.1f} pts sits within the expected measurement noise band "
+            f"(RCI = {rci_stat:.2f}, threshold ±{crit * s_diff:.1f} pts)."
+        )
+
+    return {
+        "available": True,
+        "reliable_change_threshold": round(crit * s_diff, 2),
+        "s_diff": round(s_diff, 2),
+        "status": status,
+        "rci_score": round(rci_stat, 2),
+        "net_change": round(net_change, 2),
+        "clinical_significance": desc,
+    }
+
+
+def forecast_trajectory(
+    tpi_series: list[float],
+    horizon: int = 3,
+    baseline_sd: float = 10.0,
+) -> dict:
+    """
+    Bayesian-damped linear trend projection with expanding 80% and 95% confidence bands.
+    Slope shrinks toward zero as horizon increases (damped persistence), avoiding runaway forecasts.
+    """
+    n = len(tpi_series)
+    if n < 3:
+        return {
+            "available": False,
+            "reason": "Forecast requires at least 3 completed sessions.",
+            "projections": [],
+        }
+
+    window = tpi_series[-RECENT_WINDOW:]
+    trend = ols_trend(window)
+    base_slope = trend.slope
+    latest_val = tpi_series[-1]
+    hist_sd = _stdev(window) if len(window) >= 2 else (baseline_sd * 0.5)
+    hist_sd = max(2.5, min(12.0, hist_sd))
+
+    projections = []
+    curr_mean = latest_val
+
+    for step in range(1, horizon + 1):
+        # Damping factor: 0.85^step shrinks slope towards mean reversion
+        damping = 0.85 ** step
+        step_slope = base_slope * damping
+        curr_mean = max(15.0, min(88.0, curr_mean + step_slope))
+
+        # Standard error grows with forecast horizon: sqrt(step) * residual variance
+        se_forecast = hist_sd * math.sqrt(1.0 + step * 0.5)
+        # 80% CI (z = 1.282), 95% CI (z = 1.96)
+        ci_80_lo = max(10.0, curr_mean - 1.282 * se_forecast)
+        ci_80_hi = min(95.0, curr_mean + 1.282 * se_forecast)
+        ci_95_lo = max(5.0, curr_mean - 1.96 * se_forecast)
+        ci_95_hi = min(100.0, curr_mean + 1.96 * se_forecast)
+
+        session_num = n + step
+        projections.append({
+            "session_number": session_num,
+            "projected_tpi": round(curr_mean, 1),
+            "ci_80": [round(ci_80_lo, 1), round(ci_80_hi, 1)],
+            "ci_95": [round(ci_95_lo, 1), round(ci_95_hi, 1)],
+            "expected_change": round(curr_mean - latest_val, 1),
+        })
+
+    # Summary outlook
+    final_proj = projections[-1]["projected_tpi"]
+    delta = final_proj - latest_val
+    if delta >= 4.0:
+        outlook = "Upward trajectory projected; language markers suggest continued momentum."
+    elif delta <= -4.0:
+        outlook = "Downward trajectory projected; high priority for therapeutic realignment."
+    else:
+        outlook = "Plateau/steady trajectory projected across the next 3 sessions."
+
+    return {
+        "available": True,
+        "horizon": horizon,
+        "baseline_slope": round(base_slope, 2),
+        "outlook": outlook,
+        "projections": projections,
+    }
+
+
+def assess_rupture_risk(
+    tpi_series: list[float],
+) -> dict:
+    """
+    Rupture and Alliance Risk Detector:
+    Monitors velocity of decline, consecutive drops below baseline, and volatility spikes.
+    """
+    n = len(tpi_series)
+    if n < 2:
+        return {
+            "level": "low",
+            "score": 0.0,
+            "alerts": [],
+            "recommendation": "Baseline gathering phase; monitor rapport building.",
+        }
+
+    alerts = []
+    score = 0.0
+
+    # 1. Acute single-session drop >= 7 points
+    last_drop = tpi_series[-1] - tpi_series[-2]
+    if last_drop <= -9.0:
+        score += 0.45
+        alerts.append(f"Acute drop of {abs(last_drop):.1f} TPI points in the latest session.")
+    elif last_drop <= -6.0:
+        score += 0.25
+        alerts.append(f"Sharp drop of {abs(last_drop):.1f} points from previous session.")
+
+    # 2. Consecutive declines
+    consec_down = 0
+    for i in range(len(tpi_series) - 1, 0, -1):
+        if tpi_series[i] < tpi_series[i - 1]:
+            consec_down += 1
+        else:
+            break
+    if consec_down >= 3:
+        score += 0.40
+        alerts.append(f"Sustained slide across {consec_down} consecutive sessions.")
+    elif consec_down == 2:
+        score += 0.20
+        alerts.append("Downward drift over the last 2 sessions.")
+
+    # 3. Trapped below baseline (< 45) for multiple sessions
+    below_45 = sum(1 for v in tpi_series[-3:] if v < 45.0)
+    if below_45 >= 2:
+        score += 0.30
+        alerts.append("Client language trapped below personal baseline across recent sessions.")
+
+    # 4. Excessive volatility (standard deviation > 8 in recent window)
+    if n >= 4:
+        recent_sd = _stdev(tpi_series[-4:])
+        if recent_sd > 8.0:
+            score += 0.20
+            alerts.append(f"High erratic variance (SD = {recent_sd:.1f}), indicating relational ambivalence.")
+
+    score = min(1.0, round(score, 2))
+    if score >= 0.55:
+        level = "elevated"
+        rec = "High risk of therapeutic rupture or disengagement. Recommend exploring therapeutic alliance directly and inviting client feedback."
+    elif score >= 0.30:
+        level = "moderate"
+        rec = "Moderate alliance strain detected. Consider checking in on pacing, goals, or unexpressed ambivalence."
+    else:
+        level = "low"
+        rec = "Relational momentum stable; no active rupture markers identified."
+
+    return {
+        "level": level,
+        "score": score,
+        "alerts": alerts,
+        "recommendation": rec,
+    }
+
+
 def summarise(tpi_series: list[float]) -> dict:
     """
     Two trends are reported. The overall trend answers "has therapy moved this
@@ -203,4 +403,7 @@ def summarise(tpi_series: list[float]) -> dict:
         "first": tpi_series[0] if tpi_series else None,
         "latest": tpi_series[-1] if tpi_series else None,
         "net_change": round(tpi_series[-1] - tpi_series[0], 2) if len(tpi_series) > 1 else 0.0,
+        "rci": calculate_rci(tpi_series),
+        "forecast": forecast_trajectory(tpi_series),
+        "rupture_risk": assess_rupture_risk(tpi_series),
     }

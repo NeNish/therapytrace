@@ -82,7 +82,7 @@ def seed_demo(db: DbSession = Depends(get_db)):
         db.commit()
         db.refresh(client)
 
-        for row in generate_case(shape, n, seed=1000 + i):
+        for row in generate_case(shape, n, seed=1000 + i, case_code=code):
             add_session(
                 db, client, row["transcript"], row["session_number"],
                 source=f"synthetic:{shape}",

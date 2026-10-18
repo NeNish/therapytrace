@@ -52,9 +52,44 @@ export default function Cases() {
 
       {error && <div className="notice">{error}</div>}
 
+      {clients && clients.length > 0 && (
+        <div className="panel" style={{ padding: '16px 20px', marginBottom: 20 }}>
+          <div className="readout" style={{ gap: 28 }}>
+            <div className="readout-item">
+              <div className="k">Active Caseload</div>
+              <div className="v">{clients.length}</div>
+            </div>
+            <div className="readout-item">
+              <div className="k">Gaining Momentum</div>
+              <div className="v" style={{ color: 'var(--gain)' }}>
+                {clients.filter(c => c.momentum === 'gaining').length}
+              </div>
+            </div>
+            <div className="readout-item">
+              <div className="k">Plateauing / Mixed</div>
+              <div className="v" style={{ color: 'var(--hold)' }}>
+                {clients.filter(c => c.momentum === 'plateauing' || c.momentum === 'steady').length}
+              </div>
+            </div>
+            <div className="readout-item">
+              <div className="k">Losing Ground</div>
+              <div className="v" style={{ color: 'var(--regress)' }}>
+                {clients.filter(c => c.momentum === 'regressing').length}
+              </div>
+            </div>
+            <div className="readout-item">
+              <div className="k">Total Monitored Sessions</div>
+              <div className="v">
+                {clients.reduce((acc, c) => acc + (c.n_sessions || 0), 0)}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="row" style={{ marginBottom: 20 }}>
         <button onClick={() => setShowForm((v) => !v)} className="ghost">
-          {showForm ? 'Cancel' : 'Add a case'}
+          {showForm ? 'Cancel' : '+ Add a case'}
         </button>
         <button onClick={seed} disabled={busy} className="ghost">
           {busy ? 'Loading…' : 'Load synthetic cases'}

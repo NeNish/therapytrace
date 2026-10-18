@@ -9,6 +9,8 @@ import Multimodal from './pages/Multimodal'
 import Bench from './pages/Bench'
 import Method from './pages/Method'
 import Models from './pages/Models'
+import SessionDiff from './pages/SessionDiff'
+import LiveStudio from './pages/LiveStudio'
 
 export default function App() {
   return (
@@ -18,6 +20,7 @@ export default function App() {
         <div className="rail-sub">Process monitoring</div>
         <nav>
           <NavLink to="/" end>Cases</NavLink>
+          <NavLink to="/studio">🎙️ Live Studio</NavLink>
           <NavLink to="/multimodal">Multimodal</NavLink>
           <NavLink to="/bench">Bench</NavLink>
           <NavLink to="/models">Models</NavLink>
@@ -32,7 +35,9 @@ export default function App() {
       <main className="main">
         <Routes>
           <Route path="/" element={<Cases />} />
+          <Route path="/studio" element={<LiveStudio />} />
           <Route path="/case/:id" element={<CaseTrace />} />
+          <Route path="/case/:id/compare" element={<SessionDiff />} />
           <Route path="/case/:id/therapist" element={<TherapistView />} />
           <Route path="/case/:id/insights" element={<Insights />} />
           <Route path="/session/:sid" element={<SessionView />} />
