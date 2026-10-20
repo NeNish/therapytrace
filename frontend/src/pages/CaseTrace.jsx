@@ -5,6 +5,7 @@ import ChangeTalk from '../components/ChangeTalk'
 import Resolvability from '../components/Resolvability'
 import DimensionGrid from '../components/DimensionGrid'
 import LiveRecorder from '../components/LiveRecorder'
+import GoalTracker from '../components/GoalTracker'
 import Trace from '../components/Trace'
 import { api, DIMENSION_LABELS, STATE_COPY, stateColor } from '../lib/api'
 
@@ -189,6 +190,17 @@ export default function CaseTrace() {
                 : momentum?.state === 'plateauing' ? 'Plateau' : 'Mixed'}
             </span>
           </div>
+        </div>
+      )}
+
+      {data.decline_alert?.active && (
+        <div className="alert-banner" role="status">
+          <div>
+            <strong>Downward run over {data.decline_alert.run_length} sessions</strong>
+            <p className="small">{data.decline_alert.message}</p>
+            <p className="small muted">{data.decline_alert.caveat}</p>
+          </div>
+          <Link className="btn ghost small" style={{ whiteSpace: 'nowrap' }} to={`/case/${id}/prep`}>Prep card →</Link>
         </div>
       )}
 
@@ -782,9 +794,17 @@ export default function CaseTrace() {
         </form>
       </div>
 
+      <SectionRule label="Goals" hint="What the therapist chose to work on, and whether it moved" />
+      <GoalTracker
+        clientId={id}
+        nextSession={(sessions[sessions.length - 1]?.session_number || 0) + 1}
+        refreshKey={sessions.length}
+      />
+
       <div className="row" style={{ marginTop: 8 }}>
         <Link className="btn" to={`/case/${id}/insights`}>Insights & Questions →</Link>
         <Link className="btn ghost" to={`/case/${id}/compare`}>Compare Sessions (Diff) →</Link>
+        <Link className="btn" to={`/case/${id}/prep`}>Next-session prep card →</Link>
         <Link className="btn ghost" to={`/case/${id}/therapist`}>Therapist contribution →</Link>
       </div>
     </>

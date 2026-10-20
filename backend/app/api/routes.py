@@ -8,13 +8,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
 
 from ..db import get_db
-from ..models import Client, OutcomeMeasure, TherapySession
+from ..models import Client, OutcomeMeasure, SessionGoal, TherapySession
 from ..nlp.calibration import refit_weights
+from ..nlp.care import decline_alert, evaluate_goal, prep_card
 from ..nlp.features import DIMENSIONS
+from ..nlp.narrative import DIM_WORDS as DIMENSION_WORDS
 from ..nlp.pipeline import analyse_session
 from ..nlp.therapist import INTERVENTION_LABELS
 from ..schemas import (
-    AnalyzeRequest, ClientCreate, MeasureCreate, SessionCreate,
+    AnalyzeRequest, ClientCreate, GoalCreate, MeasureCreate, SessionCreate,
+    TranslateAnalyzeRequest,
 )
 from ..services import add_session, client_summary, client_trajectory, recompute_client
 
@@ -117,6 +120,7 @@ def get_trajectory(client_id: int, db: DbSession = Depends(get_db)):
         "measures": roll.get("measures", []),
         "validation": roll.get("validation"),
         "dimensions": list(DIMENSIONS),
+        "decline_alert": decline_alert(roll.get("tpi_series", [])),
     }
 
 
@@ -638,3 +642,95 @@ async def upload_media(file: UploadFile = File(...)):
             info["warning"] = "Could not inspect the video."
 
     return info
+
+
+# --------------------------------------------------------------------------
+# session goals, prep card, multilingual input
+# --------------------------------------------------------------------------
+
+def _goals_with_status(db: DbSession, client: Client, roll: dict | None = None) -> list[dict]:
+    roll = roll if roll is not None else client_trajectory(db, client)
+    sessions = roll.get("sessions", [])
+    out = []
+    for g in db.scalars(
+        select(SessionGoal).where(SessionGoal.client_id == client.id)
+        .order_by(SessionGoal.session_number, SessionGoal.id)
+    ).all():
+        out.append({
+            "id": g.id,
+            "session_number": g.session_number,
+            "dimension": g.dimension,
+            "label": DIMENSION_WORDS.get(g.dimension, g.dimension),
+            "note": g.note,
+            "evaluation": evaluate_goal(g.dimension, g.session_number, sessions),
+        })
+    return out
+
+
+@router.get("/clients/{client_id}/goals")
+def list_goals(client_id: int, db: DbSession = Depends(get_db)):
+    client = _get_client(db, client_id)
+    return {"client_code": client.code, "goals": _goals_with_status(db, client)}
+
+
+@router.post("/clients/{client_id}/goals", status_code=201)
+def add_goal(client_id: int, payload: GoalCreate, db: DbSession = Depends(get_db)):
+    client = _get_client(db, client_id)
+    if payload.dimension not in DIMENSIONS:
+        raise HTTPException(400, f"Unknown dimension. Choose one of: {', '.join(DIMENSIONS)}.")
+    db.add(SessionGoal(client_id=client.id, **payload.model_dump()))
+    db.commit()
+    return {"client_code": client.code, "goals": _goals_with_status(db, client)}
+
+
+@router.delete("/goals/{goal_id}", status_code=204)
+def delete_goal(goal_id: int, db: DbSession = Depends(get_db)):
+    goal = db.get(SessionGoal, goal_id)
+    if not goal:
+        raise HTTPException(404, "No goal with that ID.")
+    db.delete(goal)
+    db.commit()
+
+
+@router.get("/clients/{client_id}/prep-card")
+def get_prep_card(client_id: int, db: DbSession = Depends(get_db)):
+    """A one-page brief for the next session, built only from measurements."""
+    client = _get_client(db, client_id)
+    roll = client_trajectory(db, client)
+    ordered = sorted(
+        (s for s in client.sessions if s.analysis), key=lambda s: s.session_number
+    )
+    latest_drivers = ordered[-1].analysis.drivers if ordered else {}
+    moves = therapist_impact(client_id, db)["interventions"]
+    return prep_card(
+        client.code,
+        roll.get("sessions", []),
+        roll.get("tpi_series", []),
+        latest_drivers,
+        moves,
+        roll.get("recommendation"),
+        _goals_with_status(db, client, roll),
+    )
+
+
+@router.post("/analyze/translate")
+def analyze_translated(payload: TranslateAnalyzeRequest):
+    """
+    Score a Tamil or Hindi transcript by translating it to English turn by
+    turn first. Nothing is saved. The original text is returned beside the
+    translation so a reader can check exactly what was scored.
+    """
+    from ..nlp.translate import CAVEAT, translate_transcript
+
+    tr = translate_transcript(payload.transcript, payload.language)
+    if not tr.get("available"):
+        raise HTTPException(503 if "backend" in tr.get("reason", "") else 400, tr.get("reason"))
+    if len(tr["english_transcript"]) < 20:
+        raise HTTPException(400, "The transcript is too short to score.")
+    from ..nlp.scoring import score_session_standalone
+
+    result = analyse_session(tr["english_transcript"])
+    # One transcript has no history of its own, so score its language content
+    # on the absolute scale, as the multimodal page does.
+    result["score"] = score_session_standalone(result["features"])
+    return {**tr, "analysis": result, "caveat": CAVEAT if tr["language"] != "en" else None}
