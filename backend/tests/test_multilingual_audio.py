@@ -185,6 +185,7 @@ def test_reviewed_turns_need_a_client_line(client):
 
 def test_load_audio_decodes_without_whisper_decoder(tmp_path):
     """Our own decoder works with current PyAV, which faster-whisper's does not."""
+    pytest.importorskip("av")  # optional dependency, not installed in CI
     import wave
 
     import numpy as np
