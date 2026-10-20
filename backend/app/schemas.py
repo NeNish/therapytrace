@@ -82,3 +82,14 @@ class MeasureCreate(BaseModel):
     session_number: int
     instrument: str = Field(max_length=24)
     score: float
+
+
+class GoalCreate(BaseModel):
+    session_number: int = Field(ge=1)
+    dimension: str
+    note: str | None = Field(default=None, max_length=240)
+
+
+class TranslateAnalyzeRequest(BaseModel):
+    transcript: str = Field(min_length=5)
+    language: str = "auto"  # "auto", "ta" (Tamil), "hi" (Hindi), "en"

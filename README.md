@@ -27,6 +27,7 @@ Everyone else built a thermometer. This is a progress bar.
 - [Validation](#validation)
 - [API reference](#api-reference)
 - [Project layout](#project-layout)
+- [Clinician tools and Tamil / Hindi input](#clinician-tools-and-tamil--hindi-input)
 - [Limits and ethics](#limits-and-ethics)
 
 ---
@@ -503,6 +504,10 @@ An index nobody has checked against an outcome is decoration. Do this part.
 | `DELETE` | `/api/sessions/{sid}` | Delete a session and rescore the case |
 | `GET` | `/api/calibration/weights` | Re-fit dimension weights across all cases |
 | `POST` | `/api/analyze` | Score a transcript without saving anything |
+| `GET` `POST` | `/api/clients/{id}/goals` | List / set a session goal, with its result |
+| `DELETE` | `/api/goals/{gid}` | Remove a goal |
+| `GET` | `/api/clients/{id}/prep-card` | One-page brief for the next session |
+| `POST` | `/api/analyze/translate` | Translate a Tamil or Hindi transcript, then score it |
 
 Interactive docs at `/docs`.
 
@@ -547,6 +552,41 @@ is diagnostic and means exactly one thing each — teal gaining, plum losing
 ground, slate holding, amber change point. The trace itself is hand-rolled SVG
 rather than a charting library, because the corridor-and-departure shape *is*
 the thesis of the project and no chart library draws it.
+
+---
+
+## Clinician tools and Tamil / Hindi input
+
+**Downward-run banner.** When the TPI has fallen in each of the last three
+sessions (drops under half a point are ignored as noise), the case page shows a
+banner suggesting the client be discussed in supervision. It is worded as a
+prompt, never as a statement that the client is deteriorating.
+
+**Session goals.** A therapist picks one dimension to work on in a given
+session. Once that session is scored, the dimension is compared with the
+previous session on the client's own scale: *moved toward* (rise of 0.3 SD or
+more), *held steady*, or *moved away*.
+
+**Next-session prep card.** One printable page per client: the dimension
+furthest below baseline and what to listen for, two client phrases from the
+last session worth returning to, the therapist moves that have been followed by
+movement with this client, open goals and recent goal results, and any early
+warning. Open it from the case page (*Next-session prep card*) and use *Print /
+save PDF*.
+
+**Tamil and Hindi transcripts (exploratory).** The *Tamil / Hindi* page
+translates each turn to English, keeping speaker labels (native labels such as
+சிகிச்சையாளர் / வாடிக்கையாளர் or चिकित्सक / क्लाइंट are recognised), then
+scores the English with the unchanged pipeline. Original and translation are
+shown side by side. Translation uses the Anthropic API when `ANTHROPIC_API_KEY`
+is set, or [Argos Translate](https://github.com/argosopentech/argos-translate)
+offline if it is installed with the language pack; with neither, the page says
+so instead of scoring untranslated text. The lexicon was built for English, so
+these scores are a first look, not a validated measurement.
+
+To show all of this in a demonstration, start the backend and run
+`python scripts/demo_panel.py`, which creates a synthetic case, CL-DEMO, whose
+index falls over its last three sessions and which has two goals set.
 
 ---
 
