@@ -1,0 +1,12 @@
+# Optional: offline Tamil / Hindi translation and speech recognition.
+# The core app runs without these; the Tamil / Hindi page reports what is missing.
+#
+#   pip install -r requirements-multilingual.txt
+#
+# First use downloads the models once from Hugging Face:
+#   NLLB-200 distilled 600M  (~2.5 GB)  facebook/nllb-200-distilled-600M
+#   Whisper small            (~0.5 GB)  set THERAPYTRACE_WHISPER_MODEL=medium for better Tamil (~1.5 GB)
+torch>=2.2
+transformers>=4.40
+sentencepiece>=0.2
+faster-whisper>=1.0

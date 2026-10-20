@@ -205,6 +205,8 @@ def test_translate_endpoint_scores_the_english(client, monkeypatch):
 
 def test_translate_endpoint_reports_missing_backend(client, monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("THERAPYTRACE_TRANSLATOR", raising=False)
+    monkeypatch.setattr(tr, "_nllb", lambda texts, lang: (_ for _ in ()).throw(ImportError()))
     monkeypatch.setattr(tr, "_argos", lambda texts, lang: (_ for _ in ()).throw(ImportError()))
     r = client.post("/api/analyze/translate", json={"transcript": TAMIL})
     assert r.status_code == 503

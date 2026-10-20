@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
 
@@ -17,7 +17,7 @@ from ..nlp.pipeline import analyse_session
 from ..nlp.therapist import INTERVENTION_LABELS
 from ..schemas import (
     AnalyzeRequest, ClientCreate, GoalCreate, MeasureCreate, SessionCreate,
-    TranslateAnalyzeRequest,
+    TranslateAnalyzeRequest, TurnsAnalyzeRequest,
 )
 from ..services import add_session, client_summary, client_trajectory, recompute_client
 
@@ -734,3 +734,69 @@ def analyze_translated(payload: TranslateAnalyzeRequest):
     # on the absolute scale, as the multimodal page does.
     result["score"] = score_session_standalone(result["features"])
     return {**tr, "analysis": result, "caveat": CAVEAT if tr["language"] != "en" else None}
+
+
+@router.post("/audio/transcribe")
+async def transcribe_recording(
+    file: UploadFile = File(...),
+    language: str = Form("auto"),
+):
+    """
+    Transcribe a Tamil, Hindi or English recording and translate it to
+    English. Returns timed lines with a first-guess speaker label for review.
+    Nothing is scored here, and the recording is deleted once transcribed.
+    """
+    import tempfile
+    from pathlib import Path as _P
+
+    from ..nlp.speech import transcribe_audio
+
+    suffix = _P(file.filename or "clip.wav").suffix.lower()
+    if suffix not in {".wav", ".mp3", ".m4a", ".flac", ".ogg", ".webm", ".mp4"}:
+        raise HTTPException(400, f"Unsupported audio type: {suffix}")
+    tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+    try:
+        tmp.write(await file.read())
+        tmp.close()
+        out = transcribe_audio(tmp.name, language)
+    finally:
+        _P(tmp.name).unlink(missing_ok=True)
+    if not out.get("available"):
+        code = 503 if "not installed" in out.get("reason", "") else 400
+        raise HTTPException(code, out.get("reason"))
+    return out
+
+
+@router.post("/analyze/turns")
+def analyze_turns(payload: TurnsAnalyzeRequest):
+    """
+    Score a transcript the user has reviewed line by line (speaker labels
+    confirmed). Consecutive lines from one speaker are merged into one turn.
+    """
+    from ..nlp.scoring import score_session_standalone
+    from ..nlp.speech import turns_from_lines
+    from ..nlp.translate import CAVEAT, LANG_NAMES
+
+    turns = turns_from_lines([ln.model_dump() for ln in payload.lines])
+    if not any(t["speaker"] == "CLIENT" for t in turns):
+        raise HTTPException(400, "Mark at least one line as the client's before scoring.")
+    english = "\n".join(f"{t['speaker']}: {t['english']}" for t in turns)
+    if len(english) < 20:
+        raise HTTPException(400, "The transcript is too short to score.")
+    result = analyse_session(english)
+    result["score"] = score_session_standalone(result["features"])
+    lang = payload.language
+    return {
+        "available": True,
+        "language": lang,
+        "language_name": LANG_NAMES.get(lang, lang),
+        "provider": "reviewed audio transcript",
+        "turns": [
+            {"speaker": t["speaker"], "original_speaker": t["speaker"],
+             "original": t["original"], "english": t["english"]}
+            for t in turns
+        ],
+        "english_transcript": english,
+        "analysis": result,
+        "caveat": CAVEAT if lang != "en" else None,
+    }
