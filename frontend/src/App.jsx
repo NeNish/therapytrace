@@ -8,6 +8,8 @@ import Insights from './pages/Insights'
 import Multimodal from './pages/Multimodal'
 import Bench from './pages/Bench'
 import Method from './pages/Method'
+import PrepCard from './pages/PrepCard'
+import Multilingual from './pages/Multilingual'
 
 export default function App() {
   return (
@@ -19,6 +21,7 @@ export default function App() {
           <NavLink to="/" end>Cases</NavLink>
           <NavLink to="/multimodal">Multimodal</NavLink>
           <NavLink to="/bench">Bench</NavLink>
+          <NavLink to="/multilingual">Tamil / Hindi</NavLink>
           <NavLink to="/method">How the index works</NavLink>
         </nav>
         <div className="rail-foot">
@@ -33,6 +36,8 @@ export default function App() {
           <Route path="/case/:id" element={<CaseTrace />} />
           <Route path="/case/:id/therapist" element={<TherapistView />} />
           <Route path="/case/:id/insights" element={<Insights />} />
+          <Route path="/case/:id/prep" element={<PrepCard />} />
+          <Route path="/multilingual" element={<Multilingual />} />
           <Route path="/session/:sid" element={<SessionView />} />
           <Route path="/bench" element={<Bench />} />
           <Route path="/multimodal" element={<Multimodal />} />

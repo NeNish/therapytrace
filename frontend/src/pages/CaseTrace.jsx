@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import DimensionGrid from '../components/DimensionGrid'
+import GoalTracker from '../components/GoalTracker'
 import Trace from '../components/Trace'
 import { api, DIMENSION_LABELS, STATE_COPY, stateColor } from '../lib/api'
 
@@ -104,6 +105,17 @@ export default function CaseTrace() {
       </p>
 
       {error && <div className="notice">{error}</div>}
+
+      {data.decline_alert?.active && (
+        <div className="alert-banner" role="status">
+          <div>
+            <strong>Downward run over {data.decline_alert.run_length} sessions</strong>
+            <p className="small">{data.decline_alert.message}</p>
+            <p className="small muted">{data.decline_alert.caveat}</p>
+          </div>
+          <Link className="btn ghost small" to={`/case/${id}/prep`}>Prep card →</Link>
+        </div>
+      )}
 
       {sessions.length > 0 && sessions[sessions.length - 1].confidence < 0.55 && (
         <div className="notice">
@@ -394,7 +406,14 @@ export default function CaseTrace() {
         </form>
       </div>
 
+      <GoalTracker
+        clientId={id}
+        nextSession={(sessions[sessions.length - 1]?.session_number || 0) + 1}
+        refreshKey={sessions.length}
+      />
+
       <div className="row" style={{ marginTop: 8 }}>
+        <Link className="btn" to={`/case/${id}/prep`}>Next-session prep card →</Link>
         <Link className="btn" to={`/case/${id}/insights`}>Insights & recommendation →</Link>
         <Link className="btn ghost" to={`/case/${id}/therapist`}>Therapist contribution →</Link>
       </div>

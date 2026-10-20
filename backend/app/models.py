@@ -38,6 +38,10 @@ class Client(Base):
     measures: Mapped[list["OutcomeMeasure"]] = relationship(
         back_populates="client", cascade="all, delete-orphan"
     )
+    goals: Mapped[list["SessionGoal"]] = relationship(
+        back_populates="client", cascade="all, delete-orphan",
+        order_by="SessionGoal.session_number",
+    )
 
 
 class TherapySession(Base):
@@ -99,3 +103,22 @@ class OutcomeMeasure(Base):
     score: Mapped[float] = mapped_column(Float)
 
     client: Mapped[Client] = relationship(back_populates="measures")
+
+
+class SessionGoal(Base):
+    """
+    A focus the therapist sets for a session ("work on future orientation").
+    After that session is scored, the goal dimension is compared with the
+    previous session on the client's own scale.
+    """
+
+    __tablename__ = "session_goals"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    client_id: Mapped[int] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"))
+    session_number: Mapped[int] = mapped_column(Integer)
+    dimension: Mapped[str] = mapped_column(String(40))
+    note: Mapped[str | None] = mapped_column(String(240), default=None)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=_now)
+
+    client: Mapped[Client] = relationship(back_populates="goals")

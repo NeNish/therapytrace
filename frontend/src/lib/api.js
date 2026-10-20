@@ -65,6 +65,24 @@ export const api = {
 
   analyze: (transcript) =>
     request('/analyze', { method: 'POST', body: JSON.stringify({ transcript }) }),
+
+  goals: (id) => request(`/clients/${id}/goals`),
+  addGoal: (id, payload) =>
+    request(`/clients/${id}/goals`, { method: 'POST', body: JSON.stringify(payload) }),
+  deleteGoal: (goalId) => request(`/goals/${goalId}`, { method: 'DELETE' }),
+  prepCard: (id) => request(`/clients/${id}/prep-card`),
+  analyzeTranslated: (transcript, language = 'auto') =>
+    request('/analyze/translate', {
+      method: 'POST', body: JSON.stringify({ transcript, language }),
+    }),
+}
+
+export const GOAL_STATUS = {
+  moved_toward: { text: 'Moved toward goal', cls: 'pos' },
+  held: { text: 'Held steady', cls: '' },
+  moved_away: { text: 'Moved away', cls: 'neg' },
+  pending: { text: 'Waiting for session', cls: '' },
+  no_comparison: { text: 'No earlier session', cls: '' },
 }
 
 export const DIMENSION_LABELS = {
