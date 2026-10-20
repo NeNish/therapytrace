@@ -93,3 +93,14 @@ class GoalCreate(BaseModel):
 class TranslateAnalyzeRequest(BaseModel):
     transcript: str = Field(min_length=5)
     language: str = "auto"  # "auto", "ta" (Tamil), "hi" (Hindi), "en"
+
+
+class ReviewedLine(BaseModel):
+    speaker: str = Field(pattern="^(THERAPIST|CLIENT)$")
+    original: str = ""
+    english: str = Field(min_length=1)
+
+
+class TurnsAnalyzeRequest(BaseModel):
+    language: str = "en"
+    lines: list[ReviewedLine] = Field(min_length=1)

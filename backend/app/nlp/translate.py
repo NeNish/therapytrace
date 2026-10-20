@@ -13,8 +13,12 @@ Translation backends, tried in order:
   1. a test transport (unit tests only),
   2. the Anthropic API when ANTHROPIC_API_KEY is set (same switch as the
      model-written notes),
-  3. Argos Translate, if installed with the language pack (fully offline).
-If none is available the endpoint says so rather than scoring untranslated text.
+  3. Meta's NLLB-200 through Hugging Face transformers, if installed. Fully
+     offline after a one-time model download, and covers both Tamil and Hindi,
+  4. Argos Translate, if installed with the language pack (offline; Hindi only,
+     since Argos publishes no Tamil model).
+THERAPYTRACE_TRANSLATOR=anthropic|nllb|argos forces one backend. If none is
+available the endpoint says so rather than scoring untranslated text.
 """
 
 from __future__ import annotations
@@ -127,25 +131,106 @@ def _argos(texts: list[str], lang: str) -> list[str]:
     return [at.translate(t, lang, "en") for t in texts]
 
 
+# NLLB-200 language codes for the languages this page accepts.
+NLLB_CODES = {"ta": "tam_Taml", "hi": "hin_Deva"}
+NLLB_MODEL = os.getenv("THERAPYTRACE_NLLB_MODEL", "facebook/nllb-200-distilled-600M")
+_NLLB: dict[str, Any] = {}
+
+_SENT = re.compile(r"(?<=[.!?\u0964|])\s+")
+
+
+def split_sentences(text: str) -> list[str]:
+    """
+    NLLB was trained on single sentences and degrades on long paragraphs, so a
+    turn is translated sentence by sentence and joined back together.
+    """
+    parts = [s.strip() for s in _SENT.split(text.strip()) if s.strip()]
+    return parts or [text.strip()]
+
+
+def _nllb_load():
+    if "model" not in _NLLB:
+        from transformers import AutoModelForSeq2SeqLM, AutoTokenizer  # optional
+
+        _NLLB["tok"] = AutoTokenizer.from_pretrained(NLLB_MODEL)
+        _NLLB["model"] = AutoModelForSeq2SeqLM.from_pretrained(NLLB_MODEL)
+        _NLLB["model"].eval()
+    return _NLLB["tok"], _NLLB["model"]
+
+
+def _nllb_batch(sentences: list[str], lang: str) -> list[str]:
+    """Translate a flat list of sentences into English with NLLB."""
+    import torch
+
+    tok, model = _nllb_load()
+    tok.src_lang = NLLB_CODES[lang]
+    eng = tok.convert_tokens_to_ids("eng_Latn")
+    out: list[str] = []
+    for i in range(0, len(sentences), 16):
+        chunk = sentences[i:i + 16]
+        enc = tok(chunk, return_tensors="pt", padding=True, truncation=True, max_length=256)
+        with torch.no_grad():
+            gen = model.generate(**enc, forced_bos_token_id=eng, max_new_tokens=256, num_beams=4)
+        out.extend(tok.batch_decode(gen, skip_special_tokens=True))
+    return out
+
+
+def _nllb(texts: list[str], lang: str) -> list[str]:
+    if lang not in NLLB_CODES:
+        raise RuntimeError(f"NLLB is not configured for language '{lang}'.")
+    pieces = [split_sentences(t) for t in texts]
+    flat = [s for p in pieces for s in p]
+    done = _nllb_batch(flat, lang) if flat else []
+    result, k = [], 0
+    for p in pieces:
+        result.append(" ".join(done[k:k + len(p)]).strip())
+        k += len(p)
+    return result
+
+
 def translate_texts(
     texts: list[str],
     lang: str,
     _transport: Callable[[list[str], str], list[str]] | None = None,
 ) -> tuple[list[str], str]:
     """Translate a list of strings; returns (translations, provider)."""
+    forced = os.getenv("THERAPYTRACE_TRANSLATOR", "").strip().lower()
+    out = None
+    provider = ""
+    errors: list[str] = []
+
     if _transport is not None:
         out, provider = _transport(texts, lang), "test"
-    elif os.getenv("ANTHROPIC_API_KEY"):
-        out, provider = _anthropic(texts, lang, os.environ["ANTHROPIC_API_KEY"]), "anthropic"
     else:
-        try:
-            out, provider = _argos(texts, lang), "argos"
-        except Exception as e:  # not installed, or no language pack
-            raise RuntimeError(
-                "No translation backend is available. Set ANTHROPIC_API_KEY, or "
-                "install Argos Translate with the "
-                f"{LANG_NAMES.get(lang, lang)}→English package."
-            ) from e
+        order = [forced] if forced else ["anthropic", "nllb", "argos"]
+        for name in order:
+            try:
+                if name == "anthropic":
+                    key = os.getenv("ANTHROPIC_API_KEY")
+                    if not key:
+                        errors.append("anthropic: no ANTHROPIC_API_KEY")
+                        continue
+                    out = _anthropic(texts, lang, key)
+                elif name == "nllb":
+                    out = _nllb(texts, lang)
+                elif name == "argos":
+                    out = _argos(texts, lang)
+                else:
+                    errors.append(f"unknown translator '{name}'")
+                    continue
+                provider = name
+                break
+            except Exception as e:  # not installed, no model, or no language pack
+                errors.append(f"{name}: {type(e).__name__}")
+                out = None
+
+    if out is None:
+        raise RuntimeError(
+            "No translation backend is available for "
+            f"{LANG_NAMES.get(lang, lang)}. Install the offline translator with "
+            "`pip install -r requirements-multilingual.txt` (NLLB, covers Tamil "
+            "and Hindi), or set ANTHROPIC_API_KEY. Tried: " + "; ".join(errors)
+        )
     if not isinstance(out, list) or len(out) != len(texts):
         raise RuntimeError("The translation came back with a different number of turns.")
     return [str(s).strip() for s in out], provider

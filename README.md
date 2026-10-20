@@ -508,6 +508,8 @@ An index nobody has checked against an outcome is decoration. Do this part.
 | `DELETE` | `/api/goals/{gid}` | Remove a goal |
 | `GET` | `/api/clients/{id}/prep-card` | One-page brief for the next session |
 | `POST` | `/api/analyze/translate` | Translate a Tamil or Hindi transcript, then score it |
+| `POST` | `/api/audio/transcribe` | Transcribe and translate a recording into lines for review |
+| `POST` | `/api/analyze/turns` | Score a reviewed, speaker-labelled transcript |
 
 Interactive docs at `/docs`.
 
@@ -574,15 +576,34 @@ movement with this client, open goals and recent goal results, and any early
 warning. Open it from the case page (*Next-session prep card*) and use *Print /
 save PDF*.
 
-**Tamil and Hindi transcripts (exploratory).** The *Tamil / Hindi* page
-translates each turn to English, keeping speaker labels (native labels such as
-சிகிச்சையாளர் / வாடிக்கையாளர் or चिकित्सक / क्लाइंट are recognised), then
-scores the English with the unchanged pipeline. Original and translation are
-shown side by side. Translation uses the Anthropic API when `ANTHROPIC_API_KEY`
-is set, or [Argos Translate](https://github.com/argosopentech/argos-translate)
-offline if it is installed with the language pack; with neither, the page says
-so instead of scoring untranslated text. The lexicon was built for English, so
-these scores are a first look, not a validated measurement.
+**Tamil and Hindi sessions (exploratory).** The *Tamil / Hindi* page accepts
+either a pasted transcript or an audio recording.
+
+* *Transcript:* each turn is translated to English, keeping speaker labels
+  (native labels such as சிகிச்சையாளர் / வாடிக்கையாளர் or चिकित्सक / क्लाइंट are
+  recognised), then scored with the unchanged pipeline.
+* *Audio:* upload a recording (.wav, .mp3, .m4a, .webm) or record from the
+  browser microphone. Whisper transcribes it on the machine, each line is
+  translated, and every line comes back with a first-guess speaker label
+  (questions are assumed to be the therapist's) that you confirm or flip before
+  scoring. The recording is deleted as soon as it has been transcribed.
+
+Original and translation are always shown side by side. Translation backends,
+tried in order: the Anthropic API when `ANTHROPIC_API_KEY` is set; Meta's
+NLLB-200 (offline, Tamil and Hindi); Argos Translate (offline, Hindi only).
+Force one with `THERAPYTRACE_TRANSLATOR=anthropic|nllb|argos`.
+
+Offline setup (one-time model downloads, about 3 GB in total):
+
+```bash
+cd backend
+pip install -r requirements-multilingual.txt
+# optional, better Tamil speech recognition (~1.5 GB):
+export THERAPYTRACE_WHISPER_MODEL=medium
+```
+
+The lexicon was built for English, so these scores are a first look, not a
+validated measurement.
 
 To show all of this in a demonstration, start the backend and run
 `python scripts/demo_panel.py`, which creates a synthetic case, CL-DEMO, whose

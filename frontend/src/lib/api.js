@@ -72,6 +72,16 @@ export const api = {
     request(`/clients/${id}/goals`, { method: 'POST', body: JSON.stringify(payload) }),
   deleteGoal: (goalId) => request(`/goals/${goalId}`, { method: 'DELETE' }),
   prepCard: (id) => request(`/clients/${id}/prep-card`),
+  transcribeAudio: (file, language = 'auto') => {
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('language', language)
+    return request('/audio/transcribe', { method: 'POST', body: fd })
+  },
+  analyzeTurns: (language, lines) =>
+    request('/analyze/turns', {
+      method: 'POST', body: JSON.stringify({ language, lines }),
+    }),
   analyzeTranslated: (transcript, language = 'auto') =>
     request('/analyze/translate', {
       method: 'POST', body: JSON.stringify({ transcript, language }),
